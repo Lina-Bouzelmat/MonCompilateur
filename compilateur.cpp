@@ -58,6 +58,19 @@ void Digit(void){
 		ReadChar();
 	}
 }
+void RelationalOperator(void){
+	if(current=='=' || current=='<' || current=='>'){
+		char first = current;
+		ReadChar();
+		if((first == '<' && (current == '=' || current == '>')) || (first == '>' && current == '=')){
+			first = (first << 8) + current;
+			ReadChar();
+		}
+		current = (char)(first);
+	}
+	else
+		Error("Opérateur relationnel attendu");
+}
 
 void ArithmeticExpression(void);			// Called by Term() and calls Term()
 
@@ -91,6 +104,33 @@ void ArithmeticExpression(void){
 		else
 			cout << "\tsubq	%rbx, %rax"<<endl;	// substract both operands
 		cout << "\tpush %rax"<<endl;			// store result
+	}
+
+	if(current=='=' || current=='<' || current=='>'){
+		char op = current;
+		ReadChar();
+		if((op == '<' && (current == '=' || current == '>')) || (op == '>' && current == '=')){
+			char second = current;
+			ReadChar();
+			if(op=='<' && second=='=') op = 'L';
+			else if(op=='>' && second=='=') op = 'G';
+			else if(op=='<' && second=='>') op = 'N';
+		}
+		ArithmeticExpression();
+		cout << "\tpop %rbx"<<endl;	// get first operand
+		cout << "\tpop %rax"<<endl;	// get second operand
+		cout << "\tcmpq %rbx, %rax" << endl;
+
+		switch(op){
+			case '=': cout << "\tsete %al" << endl; break;
+			case '<': cout << "\tsetl %al" << endl; break;
+			case '>': cout << "\tsetg %al" << endl; break;
+			case 'L': cout << "\tsetle %al" << endl; break;
+			case 'G': cout << "\tsetge %al" << endl; break;
+			case 'N': cout << "\tsetne %al" << endl; break;
+		}
+		cout << "\tmovzbq %al, %rax" << endl;
+		cout << "\tpush %rax" << endl;
 	}
 
 }
