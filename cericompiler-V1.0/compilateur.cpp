@@ -31,7 +31,7 @@ using namespace std;
 enum OPREL {EQU, DIFF, INF, SUP, INFE, SUPE, WTFR};
 enum OPADD {ADD, SUB, OR, WTFA};
 enum OPMUL {MUL, DIV, MOD, AND ,WTFM};
-
+//enum TYPE {UNSIGNED_INT}
 TOKEN current;				// Current token
 
 
@@ -77,19 +77,22 @@ void Error(string s){
 void Identifier(void){
 	cout << "\tpush "<<lexer->YYText()<<endl;
 	current=(TOKEN) lexer->yylex();
+	//return UNSIGNED_INT;
 }
 
 void Number(void){
 	cout <<"\tpush $"<<atoi(lexer->YYText())<<endl;
 	current=(TOKEN) lexer->yylex();
+	//return UNSIGNED_INT;
 }
 
 void Expression(void);			// Called by Term() and calls Term()
 
 void Factor(void){
+	//TYPE t;
 	if(current==RPARENT){
 		current=(TOKEN) lexer->yylex();
-		Expression();
+		/*t=*/Expression();
 		if(current!=LPARENT)
 			Error("')' était attendu");		// ")" expected
 		else
@@ -97,12 +100,14 @@ void Factor(void){
 	}
 	else 
 		if (current==NUMBER)
-			Number();
+			/*t=*/Number();
 	     	else
 				if(current==ID)
-					Identifier();
+					/*t=*/Identifier();
 				else
 					Error("'(' ou chiffre ou lettre attendue");
+
+	//return t;
 }
 
 // MultiplicativeOperator := "*" | "/" | "%" | "&&"
@@ -298,7 +303,6 @@ void AssignementStatement(void){
 	Expression();
 	cout << "\tpop "<<variable<<endl;
 }
-
 void ForStatement();
 void WhileStatement();
 void BlockStatement();
@@ -314,159 +318,157 @@ void IfStatement();
 			if(strcmp(lexer->YYText(),"FOR")==0){
 				ForStatement();
 			}
-			if(strcmp(lexer->YYText(),"WHILE")==0){
+			else if(strcmp(lexer->YYText(),"WHILE")==0){
 				WhileStatement();
 			}
-			if(strcmp(lexer->YYText(),"IF")==0){
+			else if(strcmp(lexer->YYText(),"IF")==0){
 				IfStatement();
 			}
-			if(strcmp(lexer->YYText(),"BEGIN")==0){
+			else if(strcmp(lexer->YYText(),"BEGIN")==0){
 				BlockStatement();
 			}
+			else {
+            Error("Mot-clé non reconnu");
+        }
 		}
+		else {
+        Error("Instruction attendue: identifiant ou mot-clé");
+    }
 	}
 
 // ForStatement := Identifier ":=" <Expression>, "TO" <Expression>, "DO" <instruction> ["STEP"<const>] 
- void ForStatement(void){
+void ForStatement(void){
 	unsigned long tag = TagNumber++;
-	current = (TOKEN) lexer->yylex();
-	
+	current =(TOKEN) lexer->yylex();
 	string variable;
-	bool isUnsigned = false;
 
 	if(current != ID){
 		Error("Identifiant attendu");
-	}
+	} 
 
 	if(IsDeclared(lexer->YYText())){
 		variable = lexer->YYText();
 	}
-	else{
-		Error("Identificateur non déclaré");
-	}
 
-	current =(TOKEN) lexer->yylex();
-
-	if(current == KEYWORD && (strcmp(lexer->YYText(), "unsigned")==0)){
-		isUnsigned = true;
-		current =(TOKEN) lexer->yylex();
-	}
+	variable= lexer->YYText();
+	current = (TOKEN)lexer->yylex();
 
 	if(current != ASSIGN){Error("Operateur ':=' attendu");}
 	
 	current =(TOKEN) lexer->yylex();
-
 	Expression();
-	cout << "\tpop %rbx" << endl;
-	cout << "\tmovq %rbx, " << variable << endl;
 
-	if(strcmp(lexer->YYText(), "TO")!=0){
+	cout << "\tpop " << variable << "INIT " << endl;
+
+	if(strcmp(lexer->YYText(), "TO")==0){
+		current =(TOKEN) lexer->yylex();
+		cout << "For" << tag << ":\t# debut de la boucle for" << endl;
+		Expression();
+		cout << "\tpop %rax" << endl;
+		cout << "\tcmpq " << variable << endl;
+		cout << "\tjb FinFor" << tag << endl;
+	}
+	else{
 		Error("'TO' attendu");
 	}
-	current =(TOKEN) lexer->yylex();
 
-	Expression();
-	cout << "\tpop %rax" << endl;
-	cout << "\tcmpq " << variable << endl;
-	cout << "\tjge FinFor" << tag << endl;
-	cout << "\tpush $" << variable << endl;
-	cout << "\tTestFor" << tag << ":\t# Début de la boucle" << endl;
+	if(strcmp(lexer->YYText(), "DO")==0){
+		current = (TOKEN) lexer->yylex();
+		Statement();
+		cout << "\tmov " << variable << endl;
+		cout << "\taddq $1, %rax" << endl;
+		cout << "\tmov %rax, " << variable << "\t# Stockage new variable  "<< endl;
+		cout << "\tjmp Test For" << tag << endl;
+		cout << "FinFor" << tag << ":\t# Fin de la boucle" << endl;
 
-	current = (TOKEN) lexer->yylex();
-	Statement();
-	
-	if(isUnsigned){
-		cout << "\taddq $step," << variable << endl;
 	}
+	
 	else {
-        // Si c'est signé, on peut utiliser le même pas
-        cout << "\taddq $step," << variable << endl; // Incrémenter avec le pas
-    }
-    cout << "\tpush $" << variable << endl;
-    cout << "\tjmp TestFor" << tag << endl; // Revenir à l'étape de test de la boucle
-    cout << "FinFor" << tag << ":\t# Fin de la boucle" << endl;
+        Error("DO attendu après FOR TO "); 
+	}
 }
 
 //WhileStatement := "WHILE" Expression "DO" Statement
 
 void WhileStatement(void){
 	unsigned long tag = TagNumber++;
-	string variable;
-
-	cout << "Debut de la fonction While " << tag << ":" << endl;
-
-	if(IsDeclared(lexer->YYText())){
-		variable = lexer->YYText();
-	}
-
+	//string variable;
 	current = (TOKEN) lexer->yylex();
+
+	cout << "While " << tag << ":\t#Debut de la boucle While " << endl;
+	//cout << "WHILE" << tag << ":" << endl;
+	/*if(IsDeclared(lexer->YYText())){
+		variable = lexer->YYText();
+	}*/
+
+	/*if(Expression() != BOOLEAN){
+		Error("Dans votre while ce n'est pas un booléen");
+	}*/
 	Expression();
 	cout << "\tpop %rax" << endl;
-	cout << "\tcmpq $0, %rax" << variable << endl;
-	cout << "\tjge FinWhile" << tag << endl;
+	cout << "\tcmpq $0, %rax" << /*variable <<*/ endl;
+	cout << "\tjge FinWhile" << tag << "\t# Sorti avec condition fausse" << endl;
 
-	if(strcmp(lexer->YYText(), "DO")==0){
+	if(current == KEYWORD || strcmp(lexer->YYText(), "DO")==0){
 		current =(TOKEN) lexer->yylex();
 		Statement();
 
-		cout << "\tjmp Debut de la fonction While" << tag << endl;
-		cout << "FinWhile" << tag << ":" << endl;
+		cout << "\tjmp While" << tag << endl;
+		cout << "FinWhile" << tag << ":\t# Fin de la boucle While" << endl;
 	}
 	else{
 		Error("'Do' attendu après un While");
 	}
 }
-//IfStatement := "IF" Expression "THEN" Statement [ "ELSE" Statement ]
 
+//IfStatement := "IF" Expression "THEN" Statement [ "ELSE" Statement ]
 void IfStatement(void){
 	unsigned long tag = TagNumber++;
-	string variable;
-	cout << "Debut de la fonction If " << tag << ":" << endl;
 
 	current = (TOKEN) lexer->yylex();
-
 	Expression();
+
 	cout << "\tpop %rax" << endl;
-	cout << "\tcmpq $0, %rax" << variable << endl;
-	cout << "\tje Faux" << tag << endl;
+	cout << "\tcmpq $0, %rax" << endl;
+	cout << "\tje ELSE" << tag << endl;
 
-	if(strcmp(lexer->YYText(), "THEN")!=0){ Error("'THEN' attendu après un IF");}
+	current = (TOKEN) lexer->yylex();  // Passer "IF" -> "THEN"
+	if(strcmp(lexer->YYText(), "THEN") != 0) {
+        Error("'THEN' attendu après un IF");
+    }
+	
+	current = (TOKEN) lexer->yylex();
+	Statement();
 
-		current =(TOKEN) lexer->yylex();
-		Statement();
-
+	//if(strcmp(lexer->YYText(), "THEN")!=0){ Error("'THEN' attendu après un IF");}
 		cout << "\tjmp FinIf" << tag << endl;
-		cout << "Faux" << tag << ":" << endl;
-	if(strcmp(lexer->YYText(), "ELSE")!=0){ Error("'ELSE' attendu ");}
+		cout << "ELSE" << tag << ":" << endl;
+	if(strcmp(lexer->YYText(), "ELSE")==0){
 		current =(TOKEN) lexer->yylex();
 		Statement();
-		cout << "FinIf " << tag << ":" << endl;
+	}
+	cout << "FinIf " << tag << ":" << endl;
 }
 
 //BlockStatement := "BEGIN" Statement { ";" Statement } "END"
 void BlockStatement(void){
-	int tag = TagNumber++;
-	//current = (TOKEN) lexer->yylex();
-	cout << "Texte lu : " << lexer->YYText() << endl;
-	if(current != KEYWORD || strcmp(lexer->YYText(), "BEGIN") !=0){
-		
-		Error("'BEGIN' attendu");
-	}
+	unsigned long tag = TagNumber++;
+
+	cout << "Debut du Block " << endl;
 	current = (TOKEN) lexer->yylex();
-
-	cout << "Debut de la fonction Block Begin " << tag << ":" << endl;
-
 	Statement();
 
 	while(current == SEMICOLON){
-		current = (TOKEN) lexer->yylex();
-		Statement();
-	}
-	if(current == KEYWORD && !strcmp(lexer->YYText(), "END")){ 
+ 		current = (TOKEN)lexer->yylex();
+ 		Statement();
+ 	}
+
+	if(current == KEYWORD && strcmp(lexer->YYText(), "END") == 0){
+		cout << "Fin de Block" << endl;
 		current = (TOKEN) lexer->yylex();
 	}
 	else{
-		Error("'END' attendu en fin de block");
+		Error("END attendu");
 	}
 	
 }
