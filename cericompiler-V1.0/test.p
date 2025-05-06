@@ -1,11 +1,18 @@
-[i, sum, max]
+[a, b, c]
 
-i := 1;
-sum := 0;
-max := 10;
+a := 0;
+b := 3;
+c := 0;
 
-WHILE i <= max DO
+IF b > a THEN
+    a := b + 1;
+ELSE
+    a := 1;
+
 BEGIN
-    sum := sum + i;
-    i := i + 1
+    WHILE a < 6 DO
+        a := a + 1;
+
+    FOR c := 1 TO 3 DO
+        b := b + 1
 END.

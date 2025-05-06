@@ -349,8 +349,11 @@ void ForStatement(void){
 	if(IsDeclared(lexer->YYText())){
 		variable = lexer->YYText();
 	}
+	else {
+        Error("Variable non déclarée");
+    }
 
-	variable= lexer->YYText();
+	//variable= lexer->YYText();
 	current = (TOKEN)lexer->yylex();
 
 	if(current != ASSIGN){Error("Operateur ':=' attendu");}
@@ -358,15 +361,16 @@ void ForStatement(void){
 	current =(TOKEN) lexer->yylex();
 	Expression();
 
-	cout << "\tpop " << variable << "INIT " << endl;
+	cout << "\tpop %rax" << endl;
+    cout << "\tmovq %rax, " << variable << endl;
 
 	if(strcmp(lexer->YYText(), "TO")==0){
 		current =(TOKEN) lexer->yylex();
 		cout << "For" << tag << ":\t# debut de la boucle for" << endl;
 		Expression();
-		cout << "\tpop %rax" << endl;
-		cout << "\tcmpq " << variable << endl;
-		cout << "\tjb FinFor" << tag << endl;
+		cout << "\tpop %rbx" << endl;
+		cout << "\tcmpq %rbx, " << variable << endl;
+		cout << "\tjg FinFor" << tag << endl;
 	}
 	else{
 		Error("'TO' attendu");
@@ -374,15 +378,22 @@ void ForStatement(void){
 
 	if(strcmp(lexer->YYText(), "DO")==0){
 		current = (TOKEN) lexer->yylex();
+		string before = lexer->YYText();
+
 		Statement();
-		cout << "\tmov " << variable << endl;
-		cout << "\taddq $1, %rax" << endl;
-		cout << "\tmov %rax, " << variable << "\t# Stockage new variable  "<< endl;
-		cout << "\tjmp Test For" << tag << endl;
+		if (!(before == variable)) {
+			cout << "\tpush " << variable << endl;
+			cout << "\tpush $1" << endl;
+			cout << "\tpop %rbx" << endl;
+			cout << "\tpop %rax" << endl;
+			cout << "\taddq %rbx, %rax" << endl;
+			cout << "\tpush %rax" << endl;
+			cout << "\tpop " << variable << endl;
+		}
+		cout << "\tjmp For" << tag << endl;
 		cout << "FinFor" << tag << ":\t# Fin de la boucle" << endl;
 
 	}
-	
 	else {
         Error("DO attendu après FOR TO "); 
 	}
@@ -407,8 +418,8 @@ void WhileStatement(void){
 	Expression();
 	cout << "\tpop %rax" << endl;
 	cout << "\tcmpq $0, %rax" << /*variable <<*/ endl;
-	cout << "\tjge FinWhile" << tag << "\t# Sorti avec condition fausse" << endl;
-
+	cout << "\tje FinWhile" << tag << "\t# Sorti avec condition fausse" << endl;
+	//cout << "\tjge FinWhile" << tag << "\t# Sorti avec condition fausse" << endl; // saut si c'est diff de 0 mais faut rentrer dans la boucle icii donc on enlve le g 
 	if(current == KEYWORD || strcmp(lexer->YYText(), "DO")==0){
 		current =(TOKEN) lexer->yylex();
 		Statement();
@@ -427,23 +438,29 @@ void IfStatement(void){
 
 	current = (TOKEN) lexer->yylex();
 	Expression();
+/*
+	cout << "\tpop %rax" << endl;
+	cout << "\tcmpq $0, %rax" << endl;
+	cout << "\tje ELSE" << tag <<"\t# Sauter à ELSE si la condition est fausse" << endl;*/
 
+	//current = (TOKEN) lexer->yylex();  // Passer "IF" -> "THEN"
+	if(current != KEYWORD || strcmp(lexer->YYText(), "THEN") != 0) {
+        Error("'THEN' attendu");
+    }
+	
+	current = (TOKEN) lexer->yylex();
 	cout << "\tpop %rax" << endl;
 	cout << "\tcmpq $0, %rax" << endl;
 	cout << "\tje ELSE" << tag << endl;
 
-	current = (TOKEN) lexer->yylex();  // Passer "IF" -> "THEN"
-	if(strcmp(lexer->YYText(), "THEN") != 0) {
-        Error("'THEN' attendu après un IF");
-    }
-	
-	current = (TOKEN) lexer->yylex();
 	Statement();
+	current = (TOKEN) lexer->yylex();
 
 	//if(strcmp(lexer->YYText(), "THEN")!=0){ Error("'THEN' attendu après un IF");}
-		cout << "\tjmp FinIf" << tag << endl;
-		cout << "ELSE" << tag << ":" << endl;
-	if(strcmp(lexer->YYText(), "ELSE")==0){
+	cout << "\tjmp FinIf" << tag << endl;
+	cout << "ELSE" << tag << ":" << endl;
+	
+	if(current == KEYWORD && strcmp(lexer->YYText(), "ELSE")==0){
 		current =(TOKEN) lexer->yylex();
 		Statement();
 	}
