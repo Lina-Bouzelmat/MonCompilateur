@@ -3,63 +3,79 @@
 	.align 8
 a:	.quad 0
 b:	.quad 0
-x:	.quad 0
-y:	.quad 0
-z:	.quad 0
+c:	.quad 0
+d:	.quad 0
 	.text		# The following lines contain the program
 	.globl main	# The main function must be visible from outside
 main:			# The main function body :
 	movq %rsp, %rbp	# Save the position of the stack's top
-	push $5
-	pop a
 	push $10
+	pop a
+	push $20
 	pop b
-	push $0
-	pop x
-	push $1
-	pop y
-Keyword detected: BEGIN
-Texte lu : BEGIN
-Debut de la fonction Block Begin 0:
-	push x
-	push $1
+	push a
+	push b
 	pop %rbx
 	pop %rax
 	addq	%rbx, %rax	# ADD
 	push %rax
-	pop x
-	push y
+	pop c
+	push a
+	push b
+	pop %rbx
+	pop %rax
+	addq	%rbx, %rax	# ADD
+	push %rax
 	push $2
 	pop %rbx
 	pop %rax
-	addq	%rbx, %rax	# ADD
-	push %rax
-	pop y
+	mulq	%rbx
+	push %rax	# MUL
+	pop d
 Keyword detected: IF
-Debut de la fonction If 1:
-	push x
-	push $10
+	push a
+	push b
 	pop %rax
 	pop %rbx
 	cmpq %rax, %rbx
-	jb Vrai3	# If below
+	je Vrai2	# If equal
 	push $0		# False
-	jmp Suite3
-Vrai3:	push $0xFFFFFFFFFFFFFFFF		# True
-Suite3:
+	jmp Suite2
+Vrai2:	push $0xFFFFFFFFFFFFFFFF		# True
+Suite2:
 	pop %rax
 	cmpq $0, %rax
-	je Faux1
-Keyword detected: BEGIN
-Texte lu : BEGIN
-Debut de la fonction Block Begin 3:
-	push x
-	push y
+	je ELSE0
+	push $100
+	pop c
+	jmp FinIf0
+ELSE0:
+	push $200
+	pop c
+FinIf 0:
+Keyword detected: WHILE
+While 2:	#Debut de la boucle While 
+	push c
+	push $300
+	pop %rax
+	pop %rbx
+	cmpq %rax, %rbx
+	jb Vrai4	# If below
+	push $0		# False
+	jmp Suite4
+Vrai4:	push $0xFFFFFFFFFFFFFFFF		# True
+Suite4:
+	pop %rax
+	cmpq $0, %rax
+	je FinWhile2	# Sorti avec condition fausse
+	push c
+	push $1
 	pop %rbx
 	pop %rax
 	addq	%rbx, %rax	# ADD
 	push %rax
-	pop z
-Keyword detected: END
-	jmp FinIf1
-Faux1:
+	pop c
+	jmp While2
+FinWhile2:	# Fin de la boucle While
+	movq %rbp, %rsp		# Restore the position of the stack's top
+	ret			# Return from main function
