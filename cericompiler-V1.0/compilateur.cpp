@@ -264,6 +264,8 @@ void DeclarationPart(void){
 	if(current!=RBRACKET)
 		Error("caractère '[' attendu");
 	cout << "\t.data"<<endl;
+	cout << "FormatString1:\t.string \"%llu\\n\"\n";  // affichage d'un entier 64 bits
+
 	cout << "\t.align 8"<<endl;
 	
 	current=(TOKEN) lexer->yylex();
@@ -392,7 +394,7 @@ void IfStatement();
 			AssignementStatement();
 		}
 		else if(current == KEYWORD){
-			cout << "Keyword detected: " << lexer->YYText() << endl;
+			//cout << "Keyword detected: " << lexer->YYText() << endl;
 			if(strcmp(lexer->YYText(),"FOR")==0){
 				ForStatement();
 			}
@@ -404,6 +406,19 @@ void IfStatement();
 			}
 			else if(strcmp(lexer->YYText(),"BEGIN")==0){
 				BlockStatement();
+			}
+			else if(strcmp(lexer->YYText(), "DISPLAY") == 0){
+				current = (TOKEN) lexer->yylex();
+				TYPE exprType = Expression();
+				if(exprType != UNSIGNED_INT){
+					Error("DISPLAY ne peut afficher que des entiers");
+				}
+				cout << "\tpop %rsi\t\t# valeur à afficher\n";
+				cout << "\tmovq $FormatString1, %rdi\t# format\n";
+				cout << "\tmovl $0, %eax\n";
+				cout << "\tpush %rbp\t\t# sauvegarder base pointer\n";
+				cout << "\tcall printf@PLT\n";
+				cout << "\tpop %rbp\t\t# restaurer base pointer\n";
 			}
 			else {
             Error("Mot-clé non reconnu");
@@ -448,7 +463,7 @@ void ForStatement(void){
 
 	if(strcmp(lexer->YYText(), "TO")==0){
 		current =(TOKEN) lexer->yylex();
-		cout << "For" << tag << ":\t# debut de la boucle for" << endl;
+		cout << "For" << tag << ":\n";
 		TYPE expr2 = Expression();
 		if(expr2 != UNSIGNED_INT){
 			Error("Type entier attendu pour la limite du FOR");
@@ -476,7 +491,7 @@ void ForStatement(void){
 			cout << "\tpop " << variable << endl;
 		}
 		cout << "\tjmp For" << tag << endl;
-		cout << "FinFor" << tag << ":\t# Fin de la boucle" << endl;
+		cout << "FinFor" << tag << ":\n";
 
 	}
 	else {
@@ -491,7 +506,7 @@ void WhileStatement(void){
 	//string variable;
 	current = (TOKEN) lexer->yylex();
 
-	cout << "While " << tag << ":\t#Debut de la boucle While " << endl;
+	cout << "While" << tag << ":\n";
 	//cout << "WHILE" << tag << ":" << endl;
 	/*if(IsDeclared(lexer->YYText())){
 		variable = lexer->YYText();
@@ -549,20 +564,21 @@ void IfStatement(void){
 
 	//if(strcmp(lexer->YYText(), "THEN")!=0){ Error("'THEN' attendu après un IF");}
 	cout << "\tjmp FinIf" << tag << endl;
-	cout << "ELSE" << tag << ":" << endl;
+	cout << "ELSE" << tag << ":\n";
 	
 	if(current == KEYWORD && strcmp(lexer->YYText(), "ELSE")==0){
 		current =(TOKEN) lexer->yylex();
 		Statement();
 	}
-	cout << "FinIf " << tag << ":" << endl;
+	cout << "FinIf" << tag << ":\n";
+
 }
 
 //BlockStatement := "BEGIN" Statement { ";" Statement } "END"
 void BlockStatement(void){
 	//unsigned long tag = TagNumber++;
 
-	cout << "#Debut du Block " << endl;
+	cout << "\t# Debut du Block" << endl;
 	current = (TOKEN) lexer->yylex();
 	Statement();
 
@@ -572,7 +588,7 @@ void BlockStatement(void){
  	}
 
 	if(current == KEYWORD && strcmp(lexer->YYText(), "END") == 0){
-		cout << "# Fin de Block" << endl;
+		cout << "\t# Fin de Block" << endl;
 		current = (TOKEN) lexer->yylex();
 	}
 	else{

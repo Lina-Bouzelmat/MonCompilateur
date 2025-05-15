@@ -1,14 +1,18 @@
-[a, b, c, d]
+[a, b, c]
 
-a := 10;
-b := 20;
-c := a + b;
-d := (a + b) * 2;
+a := 5 + 3;
+b := a * 2;
 
-IF a == b THEN
-    c := 100;
+IF a < b THEN
+    c := b - a;
 ELSE
-    c := 200;
+    c := 0;
 
-WHILE c < 300 DO
-    c := c + 1.
+DISPLAY a;
+DISPLAY b;
+DISPLAY c;
+
+WHILE c < 10 DO
+    c := c + 1;
+
+DISPLAY c.
