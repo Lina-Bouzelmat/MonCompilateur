@@ -1,18 +1,14 @@
-[a, b, c]
+VAR
+  a, b : BOOLEAN;
+  c, d : INTEGER.
 
-a := 5 + 3;
-b := a * 2;
+c := 5 + 6;
+d := c * 2;
 
-IF a < b THEN
-    c := b - a;
+IF c < d THEN
+  a := 1;
 ELSE
-    c := 0;
+  a := 0;
 
-DISPLAY a;
-DISPLAY b;
 DISPLAY c;
-
-WHILE c < 10 DO
-    c := c + 1;
-
-DISPLAY c.
+DISPLAY d.

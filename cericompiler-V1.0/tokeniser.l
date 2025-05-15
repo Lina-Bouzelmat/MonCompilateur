@@ -23,13 +23,14 @@ stringconst  \"[^\n"]+\"
 ws      [ \t\n\r]+
 alpha   [A-Za-z]
 digit   [0-9]
+floatnumber  {digit}+"."{digit}+
 number  {digit}+
 id	{alpha}({alpha}|{digit})*
 addop	(\+|\-|\|\|)
 mulop	(\*|\/|%|\&\&)
 relop	(\<|\>|"=="|\<=|\>=|!=)
 unknown [^\"A-Za-z0-9 \n\r\t\(\)\<\>\=\!\%\&\|\}\-\;\.]+
-keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"
+keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"|"BOOLEAN"|"INTEGER"|"DOUBLE"
 
 %%
 
@@ -45,6 +46,7 @@ keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"
 ","		return COMMA;
 ";"		return SEMICOLON;
 "."		return DOT;
+":"     return COLON;
 ":="		return ASSIGN;
 "("		return RPARENT;
 ")"		return LPARENT;

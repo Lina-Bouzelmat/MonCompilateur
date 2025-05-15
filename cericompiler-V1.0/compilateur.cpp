@@ -21,6 +21,7 @@
 #include <string>
 #include <iostream>
 #include <cstdlib>
+#include <vector>
 #include <set>
 #include <map>
 #include <FlexLexer.h>
@@ -291,6 +292,60 @@ void DeclarationPart(void){
 	//return UNSIGNED_INT;
 
 }
+// VarDeclarationPart := "VAR" VarDeclaration {";" VarDeclaration} "."
+// VarDeclaration := Ident {"," Ident} ":" Type
+void VarDeclarationPart() {
+	if(current == KEYWORD && strcmp(lexer->YYText(), "VAR") == 0) {
+		cout << "\t.data" << endl;
+		cout << "FormatString1:\t.string \"%llu\\n\"\n";
+		cout << "\t.align 8" << endl;
+
+		current = (TOKEN) lexer->yylex();  // on avance après VAR
+
+		while(current == ID) {
+			vector<string> identifiants;
+			identifiants.push_back(lexer->YYText());
+
+			current = (TOKEN) lexer->yylex();
+			while(current == COMMA) {
+				current = (TOKEN) lexer->yylex();
+				if(current != ID) Error("Identifiant attendu après virgule");
+				identifiants.push_back(lexer->YYText());
+				current = (TOKEN) lexer->yylex();
+			}
+
+			if(current != COLON) Error("':' attendu après identifiants");
+
+			current = (TOKEN) lexer->yylex();
+			TYPE type;
+			if(strcmp(lexer->YYText(), "BOOLEAN") == 0) {
+				type = BOOLEAN;
+			} else if(strcmp(lexer->YYText(), "INTEGER") == 0) {
+				type = UNSIGNED_INT;
+			} else if(strcmp(lexer->YYText(), "DOUBLE") == 0) {
+				type = DOUBLE;  // TP7
+			}else {
+				Error("Type inconnu");
+			}
+
+			for(auto id : identifiants) {
+				if(IsDeclared(id.c_str())) Error("Variable déjà déclarée : " + id);
+				DeclaredVariables.insert(id);
+				VariableTypes[id] = type;
+				cout << id << ":\t.quad 0" << endl;
+			}
+
+			current = (TOKEN) lexer->yylex();
+			if(current == SEMICOLON) {
+				current = (TOKEN) lexer->yylex();
+			}
+		}
+
+		if(current != DOT) Error("'.' attendu en fin de déclaration");
+		current = (TOKEN) lexer->yylex();  // passer le '.'
+	}
+}
+
 
 // RelationalOperator := "==" | "!=" | "<" | ">" | "<=" | ">="  
 OPREL RelationalOperator(void){
@@ -361,10 +416,12 @@ void AssignementStatement(void){
 	string variable;
 	if(current!=ID)
 		Error("Identificateur attendu");
+
 	if(!IsDeclared(lexer->YYText())){
 		cerr << "Erreur : Variable '"<<lexer->YYText()<<"' non déclarée"<<endl;
 		exit(-1);
 	}
+
 	variable=lexer->YYText();
 	//TYPE varType = UNSIGNED_INT;
 	TYPE varType = VariableTypes[variable];
@@ -372,14 +429,17 @@ void AssignementStatement(void){
 	current=(TOKEN) lexer->yylex();
 	if(current!=ASSIGN)
 		Error("caractères ':=' attendus");
+
 	current=(TOKEN) lexer->yylex();
 	TYPE exprType = Expression();
 
 	// Vérification la compatibilité des types
+	// AJOUT TP6 : accepte BOOLEAN := UNSIGNED_INT (comme a := 1)
 	if(varType != exprType){
-		Error("Type incompatible entre la variable et l'expression");
+		if (!(varType == BOOLEAN && exprType == UNSIGNED_INT)) {
+        	Error("Type incompatible entre la variable et l'expression");
+    	}
 	}
-
 	//Expression();
 	cout << "\tpop "<<variable<<endl;
 }
@@ -614,10 +674,13 @@ void StatementPart(void){
 
 // Program := [DeclarationPart] StatementPart
 void Program(void){
-	if(current==RBRACKET)
+	if(current==KEYWORD && strcmp(lexer->YYText(), "VAR") == 0)
+		VarDeclarationPart();
+	else if(current==RBRACKET)
 		DeclarationPart();
 	StatementPart();	
 }
+
 
 int main(void){	// First version : Source code on standard input and assembly code on standard output
 	// Header for gcc assembler / linker
