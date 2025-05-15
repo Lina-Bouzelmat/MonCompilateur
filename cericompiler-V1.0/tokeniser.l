@@ -25,12 +25,13 @@ alpha   [A-Za-z]
 digit   [0-9]
 floatnumber  {digit}+"."{digit}+
 number  {digit}+
+chartoken    \'[^\']\'
 id	{alpha}({alpha}|{digit})*
 addop	(\+|\-|\|\|)
 mulop	(\*|\/|%|\&\&)
 relop	(\<|\>|"=="|\<=|\>=|!=)
 unknown [^\"A-Za-z0-9 \n\r\t\(\)\<\>\=\!\%\&\|\}\-\;\.]+
-keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"|"BOOLEAN"|"INTEGER"|"DOUBLE"
+keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"|"BOOLEAN"|"INTEGER"|"DOUBLE"|"CHAR"
 
 %%
 
@@ -38,6 +39,8 @@ keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"
 {addop}		return ADDOP;
 {mulop}		return MULOP;
 {relop}		return RELOP;
+{floatnumber}	return NUMBER;
+{chartoken}	return STRINGCONST;
 {number}	return NUMBER;
 {id}		return ID;
 {stringconst}	return STRINGCONST;

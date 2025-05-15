@@ -1,14 +1,12 @@
 VAR
-  a, b : BOOLEAN;
-  c, d : INTEGER.
+  a : INTEGER;
+  b : DOUBLE;
+  c : CHAR.
 
-c := 5 + 6;
-d := c * 2;
+a := 42;
+b := 3.14;
+c := 'Z';
 
-IF c < d THEN
-  a := 1;
-ELSE
-  a := 0;
-
-DISPLAY c;
-DISPLAY d.
+DISPLAY a;
+DISPLAY b;
+DISPLAY c.

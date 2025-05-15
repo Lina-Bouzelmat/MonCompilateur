@@ -34,7 +34,7 @@ using namespace std;
 enum OPREL {EQU, DIFF, INF, SUP, INFE, SUPE, WTFR};
 enum OPADD {ADD, SUB, OR, WTFA};
 enum OPMUL {MUL, DIV, MOD, AND ,WTFM};
-enum TYPE {UNSIGNED_INT, BOOLEAN, ERROR_TYPE};
+enum TYPE {UNSIGNED_INT, BOOLEAN, DOUBLE, CHAR, ERROR_TYPE};
 TOKEN current;				// Current token
 
 
@@ -266,6 +266,8 @@ void DeclarationPart(void){
 		Error("caractère '[' attendu");
 	cout << "\t.data"<<endl;
 	cout << "FormatString1:\t.string \"%llu\\n\"\n";  // affichage d'un entier 64 bits
+	cout << "FormatString2:\t.string \"%f\\n\"\n";  // tp7
+    cout << "FormatString3:\t.string \"%c\\n\"\n";  // tp7
 
 	cout << "\t.align 8"<<endl;
 	
@@ -298,6 +300,8 @@ void VarDeclarationPart() {
 	if(current == KEYWORD && strcmp(lexer->YYText(), "VAR") == 0) {
 		cout << "\t.data" << endl;
 		cout << "FormatString1:\t.string \"%llu\\n\"\n";
+		cout << "FormatString2:\t.string \"%f\\n\"\n";  // tp7
+    	cout << "FormatString3:\t.string \"%c\\n\"\n";  // tp7
 		cout << "\t.align 8" << endl;
 
 		current = (TOKEN) lexer->yylex();  // on avance après VAR
@@ -324,7 +328,11 @@ void VarDeclarationPart() {
 				type = UNSIGNED_INT;
 			} else if(strcmp(lexer->YYText(), "DOUBLE") == 0) {
 				type = DOUBLE;  // TP7
-			}else {
+			}
+			else if(strcmp(lexer->YYText(), "CHAR") == 0){
+    			type = CHAR;  // tp7
+			}
+			else {
 				Error("Type inconnu");
 			}
 
@@ -449,45 +457,60 @@ void BlockStatement();
 void IfStatement();
 
 	// Statement := AssignementStatement
-	void Statement(void){
-		if(current==ID){
-			AssignementStatement();
+void Statement(void){
+	if(current==ID){
+		AssignementStatement();
+	}
+	else if(current == KEYWORD){
+		//cout << "Keyword detected: " << lexer->YYText() << endl;
+		if(strcmp(lexer->YYText(),"FOR")==0){
+			ForStatement();
 		}
-		else if(current == KEYWORD){
-			//cout << "Keyword detected: " << lexer->YYText() << endl;
-			if(strcmp(lexer->YYText(),"FOR")==0){
-				ForStatement();
-			}
-			else if(strcmp(lexer->YYText(),"WHILE")==0){
-				WhileStatement();
-			}
-			else if(strcmp(lexer->YYText(),"IF")==0){
-				IfStatement();
-			}
-			else if(strcmp(lexer->YYText(),"BEGIN")==0){
-				BlockStatement();
-			}
-			else if(strcmp(lexer->YYText(), "DISPLAY") == 0){
-				current = (TOKEN) lexer->yylex();
-				TYPE exprType = Expression();
-				if(exprType != UNSIGNED_INT){
-					Error("DISPLAY ne peut afficher que des entiers");
-				}
-				cout << "\tpop %rsi\t\t# valeur à afficher\n";
-				cout << "\tmovq $FormatString1, %rdi\t# format\n";
-				cout << "\tmovl $0, %eax\n";
-				cout << "\tpush %rbp\t\t# sauvegarder base pointer\n";
-				cout << "\tcall printf@PLT\n";
-				cout << "\tpop %rbp\t\t# restaurer base pointer\n";
-			}
-			else {
+		else if(strcmp(lexer->YYText(),"WHILE")==0){
+			WhileStatement();
+		}
+		else if(strcmp(lexer->YYText(),"IF")==0){
+			IfStatement();
+		}
+		else if(strcmp(lexer->YYText(),"BEGIN")==0){
+			BlockStatement();
+		}
+		else if(strcmp(lexer->YYText(), "DISPLAY") == 0){
+			current = (TOKEN) lexer->yylex();
+			TYPE exprType = Expression();
+			if(exprType == DOUBLE){
+                cout << "	pop %rax";  // tp7
+                cout << "	fldl (%rsp)";  // tp7
+                cout << "	addq $8, %rsp";  // tp7
+                cout << "	subq $8, %rsp";  // tp7
+                cout << "	fstpl (%rsp)";  // tp7
+                cout << "	movq $FormatString2, %rdi";  // tp7
+                cout << "	movl $1, %eax";  // tp7
+                cout << "	call printf@PLT";  // tp7
+            }
+            else if(exprType == CHAR){
+                cout << "	pop %rsi";  // tp7
+                cout << "	movq $FormatString3, %rdi";  // tp7
+                cout << "	movl $0, %eax";  // tp7
+                cout << "	call printf@PLT";  // tp7
+            }
+            else {
+                cout << "	pop %rsi		# valeur à afficher";
+                cout << "	movq $FormatString1, %rdi	# format";
+                cout << "	movl $0, %eax";
+                cout << "	push %rbp		# sauvegarder base pointer";
+                cout << "	call printf@PLT";
+                cout << "	pop %rbp		# restaurer base pointer";
+            }
+        }
+		else {
             Error("Mot-clé non reconnu");
         }
-		}
-		else {
-        Error("Instruction attendue: identifiant ou mot-clé");
-		}
 	}
+	else {
+       	Error("Instruction attendue: identifiant ou mot-clé");
+	}
+}
 
 // ForStatement := Identifier ":=" <Expression>, "TO" <Expression>, "DO" <instruction> ["STEP"<const>] 
 void ForStatement(void){
