@@ -35,6 +35,13 @@ enum OPREL {EQU, DIFF, INF, SUP, INFE, SUPE, WTFR};
 enum OPADD {ADD, SUB, OR, WTFA};
 enum OPMUL {MUL, DIV, MOD, AND ,WTFM};
 enum TYPE {UNSIGNED_INT, BOOLEAN, DOUBLE, CHAR, ERROR_TYPE};
+
+// Function prototypes
+TYPE Expression(void);
+TYPE SimpleExpression(void);
+OPREL RelationalOperator(void);
+TYPE Factor(void);
+TYPE Term(void);
 TOKEN current;				// Current token
 
 
@@ -93,19 +100,136 @@ TYPE Identifier(void){
     if (t == ERROR_TYPE)
         Error("Variable non déclarée: " + string(lexer->YYText()));
     
-    cout << "\tpush " << lexer->YYText() << endl;
+	cout << "\tmovq " << lexer->YYText() << "(%rip), %rax" << endl;
+    cout << "\tpushq %rax" << endl;
+    
     current = (TOKEN) lexer->yylex();
     return t;
 }
 
 TYPE Number(void){
-	cout << "\tpush $" << atoi(lexer->YYText()) << endl;
-	current = (TOKEN) lexer->yylex();
-	return UNSIGNED_INT;
+	if (strchr(lexer->YYText(), '.')) { // Si c'est un flottant
+        double f = atof(lexer->YYText());
+        unsigned long long *i = (unsigned long long*)&f;
+        cout << "\tpushq $" << *i << "\t# empile le flottant " << f << endl;
+        current = (TOKEN)lexer->yylex();
+        return DOUBLE;
+    } else if (lexer->YYText()[0] == '\'') { // Si c'est un caractère
+        char c = lexer->YYText()[1];
+        cout << "\tpushq $" << (int)c << "\t# empile le caractère '" << c << "'" << endl;
+        current = (TOKEN)lexer->yylex();
+        return CHAR;
+    } else { // Si c'est un entier
+        cout << "\tpushq $" << atoi(lexer->YYText()) << endl;
+        current = (TOKEN)lexer->yylex();
+        return UNSIGNED_INT;
+    }
 }
 
-TYPE Expression(void);			// Called by Term() and calls Term()
+// Expression := SimpleExpression [RelationalOperator SimpleExpression]
+TYPE Expression(void){
+	OPREL oprel;
+	TYPE t1=SimpleExpression();
+	if(current==RELOP){
+		oprel=RelationalOperator();
+		TYPE t2=SimpleExpression();
+		if(t1!=t2)
+			Error("Type incompatibles pour expression relationnelle");
+		 switch(t1) {
+            case DOUBLE:
+                cout << "\tfldl 8(%rsp)" << endl;    // Second opérande
+                cout << "\tfldl (%rsp)" << endl;     // Premier opérande
+                cout << "\taddq $16, %rsp" << endl;  // Nettoie la pile
+                cout << "\tfcomip %st(1), %st(0)" << endl;  // Compare et pop
+                cout << "\tfstp %st(0)" << endl;     // Pop le dernier nombre
+                break;
+                
+            case CHAR:
+                cout << "\tpopq %rax" << endl;
+                cout << "\tpopq %rbx" << endl;
+                cout << "\tcmpb %al, %bl" << endl;  // Compare les octets
+                break;
+                
+            default:  // UNSIGNED_INT et BOOLEAN
+                cout << "\tpopq %rax" << endl;
+                cout << "\tpopq %rbx" << endl;
+                cout << "\tcmpq %rax, %rbx" << endl;
+        }
+        switch(oprel) {
+			case EQU:
+				cout << "\tje Vrai" << ++TagNumber << "\t# If equal" << endl;
+				break;
+			case DIFF:
+				cout << "\tjne Vrai" << ++TagNumber << "\t# If different" << endl;
+				break;
+			case SUPE:
+				cout << "\tjae Vrai" << ++TagNumber << "\t# If above or equal" << endl;
+				break;
+			case INFE:
+				cout << "\tjbe Vrai" << ++TagNumber << "\t# If below or equal" << endl;
+				break;
+			case INF:
+				cout << "\tjb Vrai" << ++TagNumber << "\t# If below" << endl;
+				break;
+			case SUP:
+				cout << "\tja Vrai" << ++TagNumber << "\t# If above" << endl;
+				break;
+			default:
+				Error("Opérateur de comparaison inconnu");
+		}
+		cout << "\tpushq $0\t\t# False"<<endl;
+		cout << "\tjmp Suite"<<TagNumber<<endl;
+		cout << "Vrai"<<TagNumber<<":\tpushq $0xFFFFFFFFFFFFFFFF\t\t# True"<<endl;	
+		cout << "Suite"<<TagNumber<<":"<<endl;
+		return BOOLEAN;
+	}
+	return t1;
+}			// Called by Term() and calls Term()
+// Expression := SimpleExpression [RelationalOperator SimpleExpression]
+/*TYPE Expression(void){
+	OPREL oprel;
+	TYPE t1 = SimpleExpression();
+	if(current==RELOP){
+		oprel=RelationalOperator();
+		TYPE t2 = SimpleExpression();
+		if(t1 != t2){
+			Error("Type incompatibles pour expression relationnelle");
+		}
+		cout << "\tpop %rax"<<endl;
+		cout << "\tpop %rbx"<<endl;
+		cout << "\tcmpq %rax, %rbx"<<endl;
+		switch(oprel){
+			case EQU:
+				cout << "\tje Vrai"<<++TagNumber<<"\t# If equal"<<endl;
+				break;
+			case DIFF:
+				cout << "\tjne Vrai"<<++TagNumber<<"\t# If different"<<endl;
+				break;
+			case SUPE:
+				cout << "\tjae Vrai"<<++TagNumber<<"\t# If above or equal"<<endl;
+				break;
+			case INFE:
+				cout << "\tjbe Vrai"<<++TagNumber<<"\t# If below or equal"<<endl;
+				break;
+			case INF:
+				cout << "\tjb Vrai"<<++TagNumber<<"\t# If below"<<endl;
+				break;
+			case SUP:
+				cout << "\tja Vrai"<<++TagNumber<<"\t# If above"<<endl;
+				break;
+			default:
+				Error("Opérateur de comparaison inconnu");
+		}
+		cout << "\tpush $0\t\t# False"<<endl;
+		cout << "\tjmp Suite"<<TagNumber<<endl;
+		cout << "Vrai"<<TagNumber<<":\tpush $0xFFFFFFFFFFFFFFFF\t\t# True"<<endl;	
+		cout << "Suite"<<TagNumber<<":"<<endl;
+		return BOOLEAN;
+	}
+	return t1;
+}*/
 
+// Factor := "(" Expression ")" | Number | Letter
 TYPE Factor(void){
 	TYPE t;
 	if(current==RPARENT){
@@ -118,17 +242,29 @@ TYPE Factor(void){
 			return t;
 		}
 	}
-	if(current==NUMBER){
-			return Number(); 
-		}
-	     	else if(current==ID){
-			return Identifier(); 
-		}
-		else{
-			Error("'(' ou chiffre ou lettre attendue");
-			return ERROR_TYPE;
-		}
-	return t;
+	if(current == NUMBER) {
+        if(strchr(lexer->YYText(), '.')) {  // Flottant
+            double f = atof(lexer->YYText());
+            unsigned long long *i = (unsigned long long*)&f;
+            cout << "\tpushq $" << *i << "\t# empile le flottant " << f << endl;
+            current = (TOKEN)lexer->yylex();
+            return DOUBLE;
+        } else {  // Entier
+            cout << "\tpushq $" << atoi(lexer->YYText()) << endl;
+            current = (TOKEN)lexer->yylex();
+            return UNSIGNED_INT;
+        }
+    } else if(current == CHARCONST) {  // Nouveau type pour les caractères
+        char c = lexer->YYText()[1];  // Skip le premier guillemet
+        cout << "\tpushq $" << (int)c << "\t# empile le caractère '" << c << "'" << endl;
+        current = (TOKEN)lexer->yylex();
+        return CHAR;
+    } else if(current == ID) {
+        return Identifier();
+    } else {
+        Error("'(' ou chiffre ou lettre ou caractère attendu");
+        return ERROR_TYPE;
+    }
 }
 
 // MultiplicativeOperator := "*" | "/" | "%" | "&&"
@@ -148,56 +284,88 @@ OPMUL MultiplicativeOperator(void){
 }
 
 // Term := Factor {MultiplicativeOperator Factor}
-TYPE Term(void){
-	OPMUL mulop;
-	TYPE t1=Factor();
-	while(current==MULOP){
-		mulop=MultiplicativeOperator();		// Save operator in local variable
-		TYPE t2=Factor();
-		if(mulop == AND) {
-			// Convertir UNSIGNED_INT en BOOLEAN implicitement pour les opérations logiques
-			if(t1 != BOOLEAN && t1 != UNSIGNED_INT) {
-				Error("Opérateur && requiert des opérandes de type BOOLEAN ou UNSIGNED_INT");
-			}
-			if(t2 != BOOLEAN && t2 != UNSIGNED_INT) {
-				Error("Opérateur && requiert des opérandes de type BOOLEAN ou UNSIGNED_INT");
-			}
-			t1 = BOOLEAN; // Le résultat est toujours BOOLEAN
-		} else {
-			// Pour les autres opérations, on garde la vérification de type stricte
-			if(t1 != t2) {
-				Error("Type non compatible pour une op multiplicative");
-			}
-			if(t1 != UNSIGNED_INT) {
-				Error("Opérateurs *, / et % requièrent des opérandes de type UNSIGNED_INT");
-			}
-		}
-		cout << "\tpop %rbx"<<endl;	// get first operand
-		cout << "\tpop %rax"<<endl;	// get second operand
-		switch(mulop){
-			case AND:
-				cout << "\tmulq	%rbx"<<endl;	// a * b -> %rdx:%rax
-				cout << "\tpush %rax\t# AND"<<endl;	// store result
-				break;
-			case MUL:
-				cout << "\tmulq	%rbx"<<endl;	// a * b -> %rdx:%rax
-				cout << "\tpush %rax\t# MUL"<<endl;	// store result
-				break;
-			case DIV:
-				cout << "\tmovq $0, %rdx"<<endl; 	// Higher part of numerator  
-				cout << "\tdiv %rbx"<<endl;			// quotient goes to %rax
-				cout << "\tpush %rax\t# DIV"<<endl;		// store result
-				break;
-			case MOD:
-				cout << "\tmovq $0, %rdx"<<endl; 	// Higher part of numerator  
-				cout << "\tdiv %rbx"<<endl;			// remainder goes to %rdx
-				cout << "\tpush %rdx\t# MOD"<<endl;		// store result
-				break;
-			default:
-				Error("opérateur multiplicatif attendu");
-		}
-	}
-	return t1;
+TYPE Term(void) {
+    OPMUL mulop;
+    TYPE t1 = Factor();
+    while(current == MULOP) {
+        mulop = MultiplicativeOperator();
+        TYPE t2 = Factor();
+        
+        if(mulop == AND) {
+            // Gestion des opérations logiques
+            if(t1 != BOOLEAN && t1 != UNSIGNED_INT) {
+                Error("Opérateur && requiert des opérandes de type BOOLEAN ou UNSIGNED_INT");
+            }
+            if(t2 != BOOLEAN && t2 != UNSIGNED_INT) {
+                Error("Opérateur && requiert des opérandes de type BOOLEAN ou UNSIGNED_INT");
+            }
+            cout << "\tpopq %rbx" << endl;
+            cout << "\tpopq %rax" << endl;
+            cout << "\tandq %rbx, %rax" << endl;
+            cout << "\tpushq %rax" << endl;
+            t1 = BOOLEAN;
+        } else {
+            // Pour les autres opérations
+            if(t1 != t2) {
+                Error("Types incompatibles pour une opération multiplicative");
+            }
+
+            switch(t1) {
+                case DOUBLE:
+                    cout << "\tfldl 8(%rsp)" << endl;
+                    cout << "\tfldl (%rsp)" << endl;
+                    cout << "\taddq $16, %rsp" << endl;
+                    
+                    if(mulop == MUL) {
+                        cout << "\tfmulp" << endl;
+                    } else if(mulop == DIV) {
+                        cout << "\tfdivp" << endl;
+                    } else {
+                        Error("Seules les opérations * et / sont supportées pour les flottants");
+                    }
+                    cout << "\tsubq $8, %rsp" << endl;
+                    cout << "\tfstpl (%rsp)" << endl;
+                    break;
+
+                case CHAR:
+                    cout << "\tpopq %rbx" << endl;
+                    cout << "\tpopq %rax" << endl;
+                    if(mulop == MUL) {
+                        cout << "\tmulb %bl" << endl;
+                        cout << "\tpushq %rax" << endl;
+                    } else {
+                        Error("Seule la multiplication est supportée pour les caractères");
+                    }
+                    break;
+
+                case UNSIGNED_INT:
+                    cout << "\tpopq %rbx" << endl;
+                    cout << "\tpopq %rax" << endl;
+                    switch(mulop) {
+                        case MUL:
+                            cout << "\timulq %rbx, %rax" << endl;
+                            break;
+                        case DIV:
+                            cout << "\tcqto" << endl;
+                            cout << "\tidivq %rbx" << endl;
+                            break;
+                        case MOD:
+                            cout << "\tcqto" << endl;
+                            cout << "\tidivq %rbx" << endl;
+                            cout << "\tmovq %rdx, %rax" << endl;
+                            break;
+                        default:
+                            Error("Opérateur multiplicatif inconnu");
+                    }
+                    cout << "\tpushq %rax" << endl;
+                    break;
+
+                default:
+                    Error("Type non supporté pour les opérations multiplicatives");
+            }
+        }
+    }
+    return t1;
 }
 
 // AdditiveOperator := "+" | "-" | "||"
@@ -235,29 +403,71 @@ TYPE SimpleExpression(void){
 			if(t1 != t2) {
 				Error("TYPE incompatible pour une op additive");
 			}
-			if(t1 != UNSIGNED_INT) {
-				Error("Opérateurs + et - requièrent des opérandes de type UNSIGNED_INT");
-			}
-		}
-		cout << "\tpop %rbx"<<endl;	// get first operand
-		cout << "\tpop %rax"<<endl;	// get second operand
-		switch(adop){
-			case OR:
-				cout << "\taddq	%rbx, %rax\t# OR"<<endl;// operand1 OR operand2
-				break;			
-			case ADD:
-				cout << "\taddq	%rbx, %rax\t# ADD"<<endl;	// add both operands
-				break;			
-			case SUB:
-				cout << "\tsubq	%rbx, %rax\t# SUB"<<endl;	// substract both operands
-				break;
-			default:
-				Error("opérateur additif inconnu");
-		}
-		cout << "\tpush %rax"<<endl;			// store result
-	}
-	return t1;
+			
+			switch(t1) {
+                case DOUBLE:
+                    cout << "\tfldl 8(%rsp)" << endl;
+                    cout << "\tfldl (%rsp)" << endl;
+                    cout << "\taddq $16, %rsp" << endl;
+                    
+                    switch(adop) {
+                        case ADD:
+                            cout << "\tfaddp" << endl;
+                            break;
+                        case SUB:
+                            cout << "\tfsubp" << endl;
+                            break;
+                        default:
+                            Error("Opération non supportée pour les flottants");
+                    }
+                    cout << "\tsubq $8, %rsp" << endl;
+                    cout << "\tfstpl (%rsp)" << endl;
+                    break;
 
+                case CHAR:cout << "\tpopq %rbx" << endl;
+                    cout << "\tpopq %rax" << endl;
+                    cout << "\tmovb %bl, %bl" << endl;
+                    cout << "\tmovb %al, %al" << endl;
+                    
+                    switch(adop) {
+                        case ADD:
+                            cout << "\taddb %bl, %al" << endl;
+                            cout << "\tpushq %rax\t# ADD char" << endl;
+                            break;
+                        case SUB:
+                            cout << "\tsubb %bl, %al" << endl;
+                            cout << "\tpushq %rax\t# SUB char" << endl;
+                            break;
+                        default:
+                            Error("Opération non supportée pour les caractères");
+                    }
+                    break;
+
+                case UNSIGNED_INT:
+                    cout << "\tpopq %rbx" << endl;
+                    cout << "\tpopq %rax" << endl;
+                    switch(adop) {
+						case OR:
+                            cout << "\taddq %rbx, %rax\t# OR" << endl;
+                            break;
+                        case ADD:
+                            cout << "\taddq %rbx, %rax\t# ADD" << endl;
+                            break;
+                        case SUB:
+                            cout << "\tsubq %rbx, %rax\t# SUB" << endl;
+                            break;
+                        default:
+                            Error("Opérateur additif inconnu");
+                    }
+                    cout << "\tpushq %rax" << endl;
+                    break;
+
+                default:
+                    Error("Type non supporté pour les opérations additives");
+            }
+        }
+    }
+    return t1;
 }
 
 // DeclarationPart := "[" Ident {"," Ident} "]"
@@ -318,29 +528,40 @@ void VarDeclarationPart() {
 				current = (TOKEN) lexer->yylex();
 			}
 
-			if(current != COLON) Error("':' attendu après identifiants");
-
+			if(current != COLON) Error("':' attendu");
 			current = (TOKEN) lexer->yylex();
+
 			TYPE type;
-			if(strcmp(lexer->YYText(), "BOOLEAN") == 0) {
-				type = BOOLEAN;
-			} else if(strcmp(lexer->YYText(), "INTEGER") == 0) {
+			if(current != KEYWORD) Error("Type attendu");
+			if(strcmp(lexer->YYText(), "INTEGER") == 0) {
 				type = UNSIGNED_INT;
 			} else if(strcmp(lexer->YYText(), "DOUBLE") == 0) {
-				type = DOUBLE;  // TP7
-			}
-			else if(strcmp(lexer->YYText(), "CHAR") == 0){
-    			type = CHAR;  // tp7
-			}
-			else {
+                type = DOUBLE;
+            } else if(strcmp(lexer->YYText(), "CHAR") == 0) {
+                type = CHAR;
+            } else if(strcmp(lexer->YYText(), "BOOLEAN") == 0) {
+                type = BOOLEAN;
+            } else {
 				Error("Type inconnu");
 			}
 
-			for(auto id : identifiants) {
-				if(IsDeclared(id.c_str())) Error("Variable déjà déclarée : " + id);
+			for(const string& id : identifiants) {
+				if(IsDeclared(id.c_str())) {
+					Error("Variable déjà déclarée : " + id);
+				}
 				DeclaredVariables.insert(id);
 				VariableTypes[id] = type;
-				cout << id << ":\t.quad 0" << endl;
+
+				switch(type) {
+                    case DOUBLE:
+                        cout << id << ":\t.double 0.0" << endl;
+                        break;
+                    case CHAR:
+                        cout << id << ":\t.byte 0" << endl;
+                        break;
+                    default: // UNSIGNED_INT et BOOLEAN
+                        cout << id << ":\t.quad 0" << endl;
+                }
 			}
 
 			current = (TOKEN) lexer->yylex();
@@ -375,52 +596,53 @@ OPREL RelationalOperator(void){
 	return oprel;
 }
 
-// Expression := SimpleExpression [RelationalOperator SimpleExpression]
-TYPE Expression(void){
-	OPREL oprel;
-	TYPE t1 = SimpleExpression();
-	if(current==RELOP){
-		oprel=RelationalOperator();
-		TYPE t2 = SimpleExpression();
-		if(t1 != t2){
-			Error("Type incompatibles pour expression relationnelle");
-		}
-		cout << "\tpop %rax"<<endl;
-		cout << "\tpop %rbx"<<endl;
-		cout << "\tcmpq %rax, %rbx"<<endl;
-		switch(oprel){
-			case EQU:
-				cout << "\tje Vrai"<<++TagNumber<<"\t# If equal"<<endl;
-				break;
-			case DIFF:
-				cout << "\tjne Vrai"<<++TagNumber<<"\t# If different"<<endl;
-				break;
-			case SUPE:
-				cout << "\tjae Vrai"<<++TagNumber<<"\t# If above or equal"<<endl;
-				break;
-			case INFE:
-				cout << "\tjbe Vrai"<<++TagNumber<<"\t# If below or equal"<<endl;
-				break;
-			case INF:
-				cout << "\tjb Vrai"<<++TagNumber<<"\t# If below"<<endl;
-				break;
-			case SUP:
-				cout << "\tja Vrai"<<++TagNumber<<"\t# If above"<<endl;
-				break;
-			default:
-				Error("Opérateur de comparaison inconnu");
-		}
-		cout << "\tpush $0\t\t# False"<<endl;
-		cout << "\tjmp Suite"<<TagNumber<<endl;
-		cout << "Vrai"<<TagNumber<<":\tpush $0xFFFFFFFFFFFFFFFF\t\t# True"<<endl;	
-		cout << "Suite"<<TagNumber<<":"<<endl;
-		return BOOLEAN;
-	}
-	return t1;
-}
+
 
 // AssignementStatement := Identifier ":=" Expression
-void AssignementStatement(void){
+void AssignementStatement(void) {
+    string variable;
+    if(current != ID)
+        Error("Identificateur attendu");
+
+    if(!IsDeclared(lexer->YYText())) {
+        Error("Variable non déclarée : " + string(lexer->YYText()));
+    }
+
+    variable = lexer->YYText();
+    TYPE varType = VariableTypes[variable];
+
+    current = (TOKEN) lexer->yylex();
+    if(current != ASSIGN)
+        Error("caractères ':=' attendus");
+
+    current = (TOKEN) lexer->yylex();
+    TYPE exprType = Expression();
+
+    if(varType != exprType && !(varType == BOOLEAN && exprType == UNSIGNED_INT)) {
+        Error("Type incompatible entre la variable et l'expression");
+    }
+
+    switch(varType) {
+        case DOUBLE:
+            cout << "\tmovsd (%rsp), %xmm0" << endl;      // Utilise xmm0 pour les flottants
+            cout << "\taddq $8, %rsp" << endl;
+            cout << "\tmovsd %xmm0, " << variable << "(%rip)" << endl;
+            break;
+            
+        case CHAR:
+            cout << "\tmovq (%rsp), %rax" << endl;
+            cout << "\taddq $8, %rsp" << endl;
+            cout << "\tmovb %al, " << variable << "(%rip)" << endl;
+            break;
+            
+        default: // UNSIGNED_INT et BOOLEAN
+            cout << "\tmovq (%rsp), %rax" << endl;
+            cout << "\taddq $8, %rsp" << endl;
+            cout << "\tmovq %rax, " << variable << "(%rip)" << endl;
+    }
+}
+
+/*void AssignementStatement(void){
 	string variable;
 	if(current!=ID)
 		Error("Identificateur attendu");
@@ -449,8 +671,23 @@ void AssignementStatement(void){
     	}
 	}
 	//Expression();
-	cout << "\tpop "<<variable<<endl;
-}
+	switch(varType) {
+        case DOUBLE:
+            cout << "\tfldl (%rsp)" << endl;
+            cout << "\taddq $8, %rsp" << endl;
+            cout << "\tfstpl " << variable << "(%rip)" << endl;
+            break;
+            
+        case CHAR:
+            cout << "\tpopq %rax" << endl;
+            cout << "\tmovb %al, " << variable << "(%rip)" << endl;
+            break;
+            
+        default: // UNSIGNED_INT et BOOLEAN
+            cout << "\tpopq %rax" << endl;
+            cout << "\tmovq %rax, " << variable << "(%rip)" << endl;
+    }
+}*/
 void ForStatement();
 void WhileStatement();
 void BlockStatement();
@@ -478,30 +715,31 @@ void Statement(void){
 		else if(strcmp(lexer->YYText(), "DISPLAY") == 0){
 			current = (TOKEN) lexer->yylex();
 			TYPE exprType = Expression();
-			if(exprType == DOUBLE){
-                cout << "	pop %rax";  // tp7
-                cout << "	fldl (%rsp)";  // tp7
-                cout << "	addq $8, %rsp";  // tp7
-                cout << "	subq $8, %rsp";  // tp7
-                cout << "	fstpl (%rsp)";  // tp7
-                cout << "	movq $FormatString2, %rdi";  // tp7
-                cout << "	movl $1, %eax";  // tp7
-                cout << "	call printf@PLT";  // tp7
-            }
-            else if(exprType == CHAR){
-                cout << "	pop %rsi";  // tp7
-                cout << "	movq $FormatString3, %rdi";  // tp7
-                cout << "	movl $0, %eax";  // tp7
-                cout << "	call printf@PLT";  // tp7
-            }
-            else {
-                cout << "	pop %rsi		# valeur à afficher";
-                cout << "	movq $FormatString1, %rdi	# format";
-                cout << "	movl $0, %eax";
-                cout << "	push %rbp		# sauvegarder base pointer";
-                cout << "	call printf@PLT";
-                cout << "	pop %rbp		# restaurer base pointer";
-            }
+			switch(exprType) {
+        case DOUBLE:
+            cout << "\tfldl (%rsp)" << endl;      // Charge le flottant dans %st(0)
+            cout << "\taddq $8, %rsp" << endl;    // Nettoie la pile
+            cout << "\tsubq $8, %rsp" << endl;    // Réserve de l'espace
+            cout << "\tfstpl (%rsp)" << endl;     // Stocke le flottant
+            cout << "\tmovq $FormatString2, %rdi" << endl;
+            cout << "\tmovl $1, %eax" << endl;    // 1 argument flottant
+            cout << "\tcall printf@PLT" << endl;
+            cout << "\taddq $8, %rsp" << endl;    // Nettoie la pile
+            break;
+            
+        case CHAR:
+            cout << "\tpopq %rsi" << endl;         // Récupère le caractère
+            cout << "\tmovq $FormatString3, %rdi" << endl;
+            cout << "\tmovl $0, %eax" << endl;    // Pas d'argument flottant
+            cout << "\tcall printf@PLT" << endl;
+            break;
+            
+        default: // UNSIGNED_INT et BOOLEAN
+            cout << "\tpopq %rsi" << endl;
+            cout << "\tmovq $FormatString1, %rdi" << endl;
+            cout << "\tmovl $0, %eax" << endl;
+            cout << "\tcall printf@PLT" << endl;
+    }
         }
 		else {
             Error("Mot-clé non reconnu");
@@ -541,8 +779,9 @@ void ForStatement(void){
 	}
 	//Expression();
 
-	cout << "\tpop %rax" << endl;
-    cout << "\tmovq %rax, " << variable << endl;
+	cout << "\tmovq (%rsp), %rax" << endl;
+    cout << "\taddq $8, %rsp" << endl;
+    cout << "\tmovq %rax, " << variable << "(%rip)" << endl;
 
 	if(strcmp(lexer->YYText(), "TO")==0){
 		current =(TOKEN) lexer->yylex();
@@ -551,7 +790,7 @@ void ForStatement(void){
 		if(expr2 != UNSIGNED_INT){
 			Error("Type entier attendu pour la limite du FOR");
 		}
-		cout << "\tpop %rbx" << endl;
+		cout << "\tpopq %rbx" << endl;
 		cout << "\tcmpq %rbx, " << variable << endl;
 		cout << "\tjg FinFor" << tag << endl;
 	}
@@ -561,18 +800,13 @@ void ForStatement(void){
 
 	if(strcmp(lexer->YYText(), "DO")==0){
 		current = (TOKEN) lexer->yylex();
-		string before = lexer->YYText();
+		//string before = lexer->YYText();
 
 		Statement();
-		if (!(before == variable)) {
-			cout << "\tpush " << variable << endl;
-			cout << "\tpush $1" << endl;
-			cout << "\tpop %rbx" << endl;
-			cout << "\tpop %rax" << endl;
-			cout << "\taddq %rbx, %rax" << endl;
-			cout << "\tpush %rax" << endl;
-			cout << "\tpop " << variable << endl;
-		}
+		cout << "\tmovq " << variable << "(%rip), %rax" << endl;
+        cout << "\taddq $1, %rax" << endl;
+        cout << "\tmovq %rax, " << variable << "(%rip)" << endl;
+        
 		cout << "\tjmp For" << tag << endl;
 		cout << "FinFor" << tag << ":\n";
 
@@ -603,7 +837,7 @@ void WhileStatement(void){
 		Error("La condition du WHILE doit être de type BOOLEAN");
 	}
 	//Expression();
-	cout << "\tpop %rax" << endl;
+	cout << "\tpopq %rax" << endl;
 	cout << "\tcmpq $0, %rax" << /*variable <<*/ endl;
 	cout << "\tje FinWhile" << tag << "\t# Sorti avec condition fausse" << endl;
 	//cout << "\tjge FinWhile" << tag << "\t# Sorti avec condition fausse" << endl; // saut si c'est diff de 0 mais faut rentrer dans la boucle icii donc on enlve le g 
@@ -638,7 +872,7 @@ void IfStatement(void){
     }
 	
 	current = (TOKEN) lexer->yylex();
-	cout << "\tpop %rax" << endl;
+	cout << "\tpopq %rax" << endl;
 	cout << "\tcmpq $0, %rax" << endl;
 	cout << "\tje ELSE" << tag << endl;
 

@@ -21,6 +21,7 @@ using namespace std;
 
 stringconst  \"[^\n"]+\"
 ws      [ \t\n\r]+
+comment "//".*\n
 alpha   [A-Za-z]
 digit   [0-9]
 floatnumber  {digit}+"."{digit}+
@@ -35,12 +36,13 @@ keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"
 
 %%
 
+{comment}   {/* ignore les commentaires */};
 {keyword}	return KEYWORD;
 {addop}		return ADDOP;
 {mulop}		return MULOP;
 {relop}		return RELOP;
 {floatnumber}	return NUMBER;
-{chartoken}	return STRINGCONST;
+{chartoken}	return CHARCONST;
 {number}	return NUMBER;
 {id}		return ID;
 {stringconst}	return STRINGCONST;
