@@ -752,8 +752,10 @@ void Statement(void){
 }
 
 // ForStatement := Identifier ":=" <Expression>, "TO" <Expression>, "DO" <instruction> ["STEP"<const>] 
+// ForStatement := "FOR" Identifier ":=" Expression ("TO"|"DOWNTO") Expression ["STEP" Number] "DO" Statement
 void ForStatement(void){
 	unsigned long tag = TagNumber++;
+	bool isDownTo = false;
 	current =(TOKEN) lexer->yylex();
 	string variable;
 
@@ -785,36 +787,67 @@ void ForStatement(void){
     cout << "\tmovq %rax, " << variable << "(%rip)" << endl;
 
 	if(strcmp(lexer->YYText(), "TO")==0){
-		current =(TOKEN) lexer->yylex();
-		cout << "For" << tag << ":\n";
-		TYPE expr2 = Expression();
-		if(expr2 != UNSIGNED_INT){
-			Error("Type entier attendu pour la limite du FOR");
-		}
-		cout << "\tpopq %rbx" << endl;
-		cout << "\tcmpq %rbx, " << variable << endl;
-		cout << "\tjg FinFor" << tag << endl;
-	}
-	else{
-		Error("'TO' attendu");
-	}
+		isDownTo = false;
+    } else if(strcmp(lexer->YYText(), "DOWNTO") == 0) {
+        isDownTo = true;
+    } else {
+        Error("'TO' ou 'DOWNTO' attendu");
+    }
 
-	if(strcmp(lexer->YYText(), "DO")==0){
-		current = (TOKEN) lexer->yylex();
-		//string before = lexer->YYText();
+    // Début de la boucle
+    cout << "For" << tag << ":\n";
+    
+    // Évaluation de la valeur finale
+    current = (TOKEN)lexer->yylex();
+    TYPE expr2 = Expression();
+    if(expr2 != UNSIGNED_INT) {
+        Error("Type entier attendu pour la limite du FOR");
+    }
 
-		Statement();
-		cout << "\tmovq " << variable << "(%rip), %rax" << endl;
-        cout << "\taddq $1, %rax" << endl;
-        cout << "\tmovq %rax, " << variable << "(%rip)" << endl;
-        
-		cout << "\tjmp For" << tag << endl;
-		cout << "FinFor" << tag << ":\n";
+    // Gestion du STEP optionnel
+    int step = 1;
+    if(strcmp(lexer->YYText(), "STEP") == 0) {
+        current = (TOKEN)lexer->yylex();
+        if(current != NUMBER) {
+            Error("Constante numérique attendue après STEP");
+        }
+        step = atoi(lexer->YYText());
+        if(step <= 0) {
+            Error("STEP doit être positif");
+        }
+        current = (TOKEN)lexer->yylex();
+    }
 
-	}
-	else {
-        Error("DO attendu après FOR TO "); 
-	}
+    // Test de fin de boucle
+    cout << "\tpopq %rbx" << endl;
+    cout << "\tcmpq %rbx, " << variable << "(%rip)" << endl;
+    if(isDownTo) {
+        cout << "\tjl FinFor" << tag << endl;
+    } else {
+        cout << "\tjg FinFor" << tag << endl;
+    }
+
+    // Vérification de DO
+    if(strcmp(lexer->YYText(), "DO") != 0) {
+        Error("'DO' attendu");
+    }
+
+    // Corps de la boucle
+    current = (TOKEN)lexer->yylex();
+    Statement();
+
+    // Incrémentation/Décrémentation
+    cout << "\tmovq " << variable << "(%rip), %rax" << endl;
+    if(isDownTo) {
+        cout << "\tsubq $" << step << ", %rax" << endl;
+    } else {
+        cout << "\taddq $" << step << ", %rax" << endl;
+    }
+    cout << "\tmovq %rax, " << variable << "(%rip)" << endl;
+
+    // Retour au début de la boucle
+    cout << "\tjmp For" << tag << endl;
+    cout << "FinFor" << tag << ":\n";
 }
 
 //WhileStatement := "WHILE" Expression "DO" Statement
