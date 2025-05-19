@@ -246,7 +246,8 @@ TYPE Factor(void){
         if(strchr(lexer->YYText(), '.')) {  // Flottant
             double f = atof(lexer->YYText());
             unsigned long long *i = (unsigned long long*)&f;
-            cout << "\tpushq $" << *i << "\t# empile le flottant " << f << endl;
+            cout << "\tmovabs $" << *i << ", %rax\t# charge le flottant " << f << " (" << *i << ")" << endl;
+            cout << "\tpushq %rax" << endl;
             current = (TOKEN)lexer->yylex();
             return DOUBLE;
         } else {  // Entier
