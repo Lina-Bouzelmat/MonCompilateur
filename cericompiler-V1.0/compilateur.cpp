@@ -693,6 +693,7 @@ void ForStatement();
 void WhileStatement();
 void BlockStatement();
 void IfStatement();
+void CaseStatement(); 
 
 	// Statement := AssignementStatement
 void Statement(void){
@@ -713,6 +714,9 @@ void Statement(void){
 		else if(strcmp(lexer->YYText(),"BEGIN")==0){
 			BlockStatement();
 		}
+		else if(strcmp(lexer->YYText(), "CASE") == 0) {
+            CaseStatement();
+        }
 		else if(strcmp(lexer->YYText(), "DISPLAY") == 0){
 			current = (TOKEN) lexer->yylex();
 			TYPE exprType = Expression();
@@ -945,7 +949,68 @@ void BlockStatement(void){
 	else{
 		Error("END attendu");
 	}
-	
+}
+
+// CaseStatement := "CASE" Expression "OF" CaseElement {";" CaseElement} "END"
+void CaseStatement(void) {
+    unsigned long tag = TagNumber++;
+    TYPE exprType;
+    
+    // "CASE"
+    current = (TOKEN)lexer->yylex();
+    
+    // Expression à tester
+    exprType = Expression();
+    
+    // "OF"
+    if(current != KEYWORD || strcmp(lexer->YYText(), "OF") != 0) {
+        Error("'OF' attendu après CASE");
+    }
+    current = (TOKEN)lexer->yylex();
+    
+    // Sauvegarde de l'expression à comparer
+    cout << "\tpopq %rbx" << endl;  // Valeur à comparer dans %rbx
+    
+    int caseNumber = 0;
+    
+    // Traitement des éléments du CASE
+    while(current != KEYWORD || strcmp(lexer->YYText(), "END") != 0) {
+        cout << "\tmovq %rbx, %rax" << endl;  // Recharge la valeur à comparer
+        
+        // Constante
+        if(current != NUMBER && current != CHARCONST) {
+            Error("Constante attendue dans CASE");
+        }
+        
+        // Compare avec la constante
+        cout << "\tcmpq $" << lexer->YYText() << ", %rax" << endl;
+        cout << "\tjne Case" << tag << "_" << caseNumber + 1 << endl;
+        
+        current = (TOKEN)lexer->yylex();
+        
+        // ":"
+        if(current != COLON) {
+            Error("':' attendu après la constante");
+        }
+        current = (TOKEN)lexer->yylex();
+        
+        // Statement
+        Statement();
+        
+        // Saut à la fin du CASE
+        cout << "\tjmp EndCase" << tag << endl;
+        
+        cout << "Case" << tag << "_" << ++caseNumber << ":" << endl;
+        
+        // ";" optionnel
+        if(current == SEMICOLON) {
+            current = (TOKEN)lexer->yylex();
+        }
+    }
+    
+    // "END"
+    cout << "EndCase" << tag << ":" << endl;
+    current = (TOKEN)lexer->yylex();  // Passer le END
 }
 // StatementPart := Statement {";" Statement} "."
 void StatementPart(void){

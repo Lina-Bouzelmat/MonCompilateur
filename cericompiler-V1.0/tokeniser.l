@@ -32,7 +32,7 @@ addop	(\+|\-|\|\|)
 mulop	(\*|\/|%|\&\&)
 relop	(\<|\>|"=="|\<=|\>=|!=)
 unknown [^\"A-Za-z0-9 \n\r\t\(\)\<\>\=\!\%\&\|\}\-\;\.]+
-keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"|"BOOLEAN"|"INTEGER"|"DOUBLE"|"CHAR"
+keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"|"BOOLEAN"|"INTEGER"|"DOUBLE"|"CHAR"|"CASE"|"OF"
 
 %%
 
