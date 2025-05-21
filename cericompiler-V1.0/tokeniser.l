@@ -32,11 +32,11 @@ addop	(\+|\-|\|\|)
 mulop	(\*|\/|%|\&\&)
 relop	(\<|\>|"=="|\<=|\>=|!=)
 unknown [^\"A-Za-z0-9 \n\r\t\(\)\<\>\=\!\%\&\|\}\-\;\.]+
-keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"|"BOOLEAN"|"INTEGER"|"DOUBLE"|"CHAR"|"CASE"|"OF"
-
+keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"|"BOOLEAN"|"INTEGER"|"DOUBLE"|"CHAR"|"CASE"|"OF"|"CONST"|"TRUE"|"FALSE"|"MOD"
 %%
 
 {comment}   {/* ignore les commentaires */};
+"NOT"       return NOT;
 {keyword}	return KEYWORD;
 {addop}		return ADDOP;
 {mulop}		return MULOP;
@@ -52,7 +52,8 @@ keyword "BEGIN"|"END"|"IF"|"THEN"|"ELSE"|"WHILE"|"DO"|"FOR"|"TO"|"DISPLAY"|"VAR"
 ";"		return SEMICOLON;
 "."		return DOT;
 ":"     return COLON;
-":="		return ASSIGN;
+"="     return EQUAL;
+":="	return ASSIGN;
 "("		return RPARENT;
 ")"		return LPARENT;
 "!"		return NOT;

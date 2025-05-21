@@ -42,6 +42,9 @@ TYPE SimpleExpression(void);
 OPREL RelationalOperator(void);
 TYPE Factor(void);
 TYPE Term(void);
+TYPE Constant(void);
+bool IsSign(void);
+void ConstDeclarationPart(void);
 TOKEN current;				// Current token
 
 
@@ -123,6 +126,76 @@ TYPE Number(void){
         cout << "\tpushq $" << atoi(lexer->YYText()) << endl;
         current = (TOKEN)lexer->yylex();
         return UNSIGNED_INT;
+    }
+}
+
+// Forward declaration
+TYPE Constant(void);
+bool IsSign(void);
+
+// <constant> ::= <unsigned number> | <sign> <unsigned number> | <constant identifier> | <sign> <constant identifier> | <string>
+TYPE Constant(void) {
+    bool isNegative = false;
+    
+    // Gestion du signe
+    if(current == ADDOP) {
+        if(strcmp(lexer->YYText(), "-") == 0) {
+            isNegative = true;
+        } else if(strcmp(lexer->YYText(), "+") != 0) {
+            Error("Signe '+' ou '-' attendu");
+        }
+        current = (TOKEN)lexer->yylex();
+    }
+    
+    // Traitement de la constante
+    if(current == NUMBER) {
+        // Nombre non signé
+        if(strchr(lexer->YYText(), '.')) {  // Flottant
+            double val = atof(lexer->YYText());
+            if(isNegative) val = -val;
+            unsigned long long *i = (unsigned long long*)&val;
+            cout << "\tmovabs $" << *i << ", %rax\t# charge le flottant " << val << endl;
+            cout << "\tpushq %rax" << endl;
+            current = (TOKEN)lexer->yylex();
+            return DOUBLE;
+        } else {  // Entier
+            int val = atoi(lexer->YYText());
+            if(isNegative) val = -val;
+            cout << "\tpushq $" << val << endl;
+            current = (TOKEN)lexer->yylex();
+            return UNSIGNED_INT;
+        }
+    }
+    else if(current == ID) {
+        // Identificateur de constante
+        if(!IsDeclared(lexer->YYText())) {
+            Error("Constante non déclarée : " + string(lexer->YYText()));
+        }
+        string constName = lexer->YYText();
+        TYPE constType = VariableTypes[constName];
+        
+        cout << "\tmovq " << constName << "(%rip), %rax" << endl;
+        if(isNegative) {
+            cout << "\tnegq %rax" << endl;
+        }
+        cout << "\tpushq %rax" << endl;
+        
+        current = (TOKEN)lexer->yylex();
+        return constType;
+    }
+    else if(current == STRINGCONST) {
+        // Chaîne de caractères
+        if(isNegative) {
+            Error("Une chaîne ne peut pas être négative");
+        }
+        string str = lexer->YYText();
+        // Gestion des chaînes à implémenter selon vos besoins
+        current = (TOKEN)lexer->yylex();
+        return CHAR;  // Ou un type STRING si vous en avez un
+    }
+    else {
+        Error("Constante attendue (nombre, identificateur ou chaîne)");
+        return ERROR_TYPE;
     }
 }
 
@@ -533,6 +606,63 @@ void DeclarationPart(void){
 	current=(TOKEN) lexer->yylex();
 	//return UNSIGNED_INT;
 
+}
+
+void ConstDeclarationPart() {
+    if(current == KEYWORD && strcmp(lexer->YYText(), "CONST") == 0) {
+        cout << "\t.data" << endl;
+        current = (TOKEN) lexer->yylex();
+        
+        while(current == ID) {
+            string constName = lexer->YYText();
+            current = (TOKEN) lexer->yylex();
+            
+            if(current != EQUAL) Error("= attendu après l'identificateur de constante");
+            current = (TOKEN) lexer->yylex();
+            
+            // Traitement de la valeur de la constante
+            if(current == KEYWORD) {
+                // Gestion des booléens TRUE/FALSE
+                if(strcmp(lexer->YYText(), "TRUE") == 0) {
+                    cout << constName << ":\t.quad -1" << endl;  // TRUE = -1 (tous les bits à 1)
+                    DeclaredVariables.insert(constName);
+                    VariableTypes[constName] = BOOLEAN;
+                } 
+                else if(strcmp(lexer->YYText(), "FALSE") == 0) {
+                    cout << constName << ":\t.quad 0" << endl;   // FALSE = 0
+                    DeclaredVariables.insert(constName);
+                    VariableTypes[constName] = BOOLEAN;
+                }
+                else {
+                    Error("TRUE ou FALSE attendu");
+                }
+            }
+            else if(current == NUMBER) {
+                if(strchr(lexer->YYText(), '.')) {  // Si c'est un flottant
+                    cout << constName << ":\t.double " << lexer->YYText() << endl;
+                    DeclaredVariables.insert(constName);
+                    VariableTypes[constName] = DOUBLE;
+                } else {  // Si c'est un entier
+                    cout << constName << ":\t.quad " << lexer->YYText() << endl;
+                    DeclaredVariables.insert(constName);
+                    VariableTypes[constName] = UNSIGNED_INT;
+                }
+            }
+            else if(current == CHARCONST) {
+                char c = lexer->YYText()[1];  // Saute le premier guillemet
+                cout << constName << ":\t.quad " << (int)c << endl;
+                DeclaredVariables.insert(constName);
+                VariableTypes[constName] = CHAR;
+            }
+            else {
+                Error("Valeur constante attendue");
+            }
+            
+            current = (TOKEN) lexer->yylex();
+            if(current != DOT && current != SEMICOLON) Error(". ou ; attendu après la déclaration de constante");
+            if(current == SEMICOLON) current = (TOKEN) lexer->yylex();
+        }
+    }
 }
 // VarDeclarationPart := "VAR" VarDeclaration {";" VarDeclaration} "."
 // VarDeclaration := Ident {"," Ident} ":" Type
@@ -1059,10 +1189,20 @@ void StatementPart(void){
 
 // Program := [DeclarationPart] StatementPart
 void Program(void){
-	if(current==KEYWORD && strcmp(lexer->YYText(), "VAR") == 0)
-		VarDeclarationPart();
-	else if(current==RBRACKET)
+	if(current == KEYWORD) {
+        if(strcmp(lexer->YYText(), "CONST") == 0) {
+            ConstDeclarationPart();
+            if(current == KEYWORD && strcmp(lexer->YYText(), "VAR") == 0) {
+                VarDeclarationPart();
+            }
+        }
+        else if(strcmp(lexer->YYText(), "VAR") == 0) {
+            VarDeclarationPart();
+        }
+    }
+	else if(current==RBRACKET){
 		DeclarationPart();
+	}
 	StatementPart();	
 }
 
