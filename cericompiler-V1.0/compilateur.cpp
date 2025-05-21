@@ -308,8 +308,25 @@ TYPE Term(void) {
         } else {
             // Pour les autres opérations
             if(t1 != t2) {
-                Error("Types incompatibles pour une opération multiplicative");
-            }
+    // Conversion automatique INTEGER vers DOUBLE
+    if(t1 == UNSIGNED_INT && t2 == DOUBLE) {
+        cout << "\tfildq (%rsp)" << endl;      // Charge l'entier comme flottant
+        cout << "\taddq $8, %rsp" << endl;     // Nettoie la pile
+        cout << "\tsubq $8, %rsp" << endl;     // Réserve l'espace
+        cout << "\tfstpl (%rsp)" << endl;      // Stocke le résultat
+        t1 = DOUBLE;
+    }
+    else if(t1 == DOUBLE && t2 == UNSIGNED_INT) {
+        cout << "\tfildq (%rsp)" << endl;      // Charge l'entier comme flottant
+        cout << "\taddq $8, %rsp" << endl;     // Nettoie la pile
+        cout << "\tsubq $8, %rsp" << endl;     // Réserve l'espace
+        cout << "\tfstpl (%rsp)" << endl;      // Stocke le résultat
+        t2 = DOUBLE;
+    }
+    else {
+        Error("Types incompatibles pour une opération multiplicative");
+    }
+}
 
             switch(t1) {
                 case DOUBLE:
@@ -402,8 +419,24 @@ TYPE SimpleExpression(void){
 		} else {
 			// Pour les autres opérations, on garde la vérification de type stricte
 			if(t1 != t2) {
-				Error("TYPE incompatible pour une op additive");
-			}
+                if(t1 == UNSIGNED_INT && t2 == DOUBLE) {
+                    cout << "\tfildq (%rsp)" << endl;      // Charge l'entier comme flottant
+                    cout << "\taddq $8, %rsp" << endl;     // Nettoie la pile
+                    cout << "\tsubq $8, %rsp" << endl;     // Réserve l'espace
+                    cout << "\tfstpl (%rsp)" << endl;      // Stocke le résultat
+                    t1 = DOUBLE;
+                }
+                else if(t1 == DOUBLE && t2 == UNSIGNED_INT) {
+                    cout << "\tfildq (%rsp)" << endl;      // Charge l'entier comme flottant
+                    cout << "\taddq $8, %rsp" << endl;     // Nettoie la pile
+                    cout << "\tsubq $8, %rsp" << endl;     // Réserve l'espace
+                    cout << "\tfstpl (%rsp)" << endl;      // Stocke le résultat
+                    t2 = DOUBLE;
+                }
+                else {
+                    Error("Types incompatibles pour une opération additive");
+                }
+            }
 			
 			switch(t1) {
                 case DOUBLE:
@@ -411,21 +444,17 @@ TYPE SimpleExpression(void){
                     cout << "\tfldl (%rsp)" << endl;
                     cout << "\taddq $16, %rsp" << endl;
                     
-                    switch(adop) {
-                        case ADD:
-                            cout << "\tfaddp" << endl;
-                            break;
-                        case SUB:
-                            cout << "\tfsubp" << endl;
-                            break;
-                        default:
-                            Error("Opération non supportée pour les flottants");
+                    if(adop == ADD) {
+                        cout << "\tfaddp" << endl;
+                    } else if(adop == SUB) {
+                        cout << "\tfsubp" << endl;
                     }
                     cout << "\tsubq $8, %rsp" << endl;
                     cout << "\tfstpl (%rsp)" << endl;
                     break;
 
-                case CHAR:cout << "\tpopq %rbx" << endl;
+                case CHAR:
+					cout << "\tpopq %rbx" << endl;
                     cout << "\tpopq %rax" << endl;
                     cout << "\tmovb %bl, %bl" << endl;
                     cout << "\tmovb %al, %al" << endl;
