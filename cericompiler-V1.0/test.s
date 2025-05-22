@@ -9,6 +9,7 @@ CH:	.quad 65
 FormatString1:	.string "%llu\n"
 FormatString2:	.string "%f\n"
 FormatString3:	.string "%c\n"
+FormatString4:	.string "%lld\n"
 	.align 8
 i:	.quad 0
 j:	.quad 0
@@ -28,10 +29,11 @@ main:			# The main function body :
 	movq %rax, i(%rip)
 	movq i(%rip), %rax
 	pushq %rax
-	popq %rsi
+	movq (%rsp), %rsi
 	movq $FormatString1, %rdi
 	movl $0, %eax
 	call printf@PLT
+	addq $8, %rsp
 	movq PI(%rip), %rax
 	pushq %rax
 	movsd (%rsp), %xmm0
@@ -39,10 +41,7 @@ main:			# The main function body :
 	movsd %xmm0, x(%rip)
 	movq x(%rip), %rax
 	pushq %rax
-	fldl (%rsp)
-	addq $8, %rsp
-	subq $8, %rsp
-	fstpl (%rsp)
+	movsd (%rsp), %xmm0
 	movq $FormatString2, %rdi
 	movl $1, %eax
 	call printf@PLT
@@ -54,10 +53,11 @@ main:			# The main function body :
 	movq %rax, b(%rip)
 	movq b(%rip), %rax
 	pushq %rax
-	popq %rsi
-	movq $FormatString1, %rdi
+	movq (%rsp), %rsi
+	movq $FormatString4, %rdi
 	movl $0, %eax
 	call printf@PLT
+	addq $8, %rsp
 	movq CH(%rip), %rax
 	pushq %rax
 	movq (%rsp), %rax
@@ -65,10 +65,11 @@ main:			# The main function body :
 	movb %al, c(%rip)
 	movq c(%rip), %rax
 	pushq %rax
-	popq %rsi
+	movq (%rsp), %rsi
 	movq $FormatString3, %rdi
 	movl $0, %eax
 	call printf@PLT
+	addq $8, %rsp
 	pushq $1
 	movq (%rsp), %rax
 	addq $8, %rsp
@@ -81,10 +82,11 @@ For0:
 	# Debut du Block
 	movq i(%rip), %rax
 	pushq %rax
-	popq %rsi
+	movq (%rsp), %rsi
 	movq $FormatString1, %rdi
 	movl $0, %eax
 	call printf@PLT
+	addq $8, %rsp
 	# Fin de Block
 	movq i(%rip), %rax
 	addq $1, %rax
@@ -131,10 +133,7 @@ Case1_3:
 EndCase1:
 	movq x(%rip), %rax
 	pushq %rax
-	fldl (%rsp)
-	addq $8, %rsp
-	subq $8, %rsp
-	fstpl (%rsp)
+	movsd (%rsp), %xmm0
 	movq $FormatString2, %rdi
 	movl $1, %eax
 	call printf@PLT

@@ -622,20 +622,20 @@ void ConstDeclarationPart() {
             
             // Traitement de la valeur de la constante
             if(current == KEYWORD) {
-                // Gestion des booléens TRUE/FALSE
                 if(strcmp(lexer->YYText(), "TRUE") == 0) {
-                    cout << constName << ":\t.quad -1" << endl;  // TRUE = -1 (tous les bits à 1)
+                    cout << constName << ":\t.quad -1" << endl;
                     DeclaredVariables.insert(constName);
                     VariableTypes[constName] = BOOLEAN;
                 } 
                 else if(strcmp(lexer->YYText(), "FALSE") == 0) {
-                    cout << constName << ":\t.quad 0" << endl;   // FALSE = 0
+                    cout << constName << ":\t.quad 0" << endl;
                     DeclaredVariables.insert(constName);
                     VariableTypes[constName] = BOOLEAN;
                 }
                 else {
                     Error("TRUE ou FALSE attendu");
                 }
+                current = (TOKEN) lexer->yylex();
             }
             else if(current == NUMBER) {
                 if(strchr(lexer->YYText(), '.')) {  // Si c'est un flottant
@@ -647,18 +647,19 @@ void ConstDeclarationPart() {
                     DeclaredVariables.insert(constName);
                     VariableTypes[constName] = UNSIGNED_INT;
                 }
+                current = (TOKEN) lexer->yylex();
             }
             else if(current == CHARCONST) {
                 char c = lexer->YYText()[1];  // Saute le premier guillemet
                 cout << constName << ":\t.quad " << (int)c << endl;
                 DeclaredVariables.insert(constName);
                 VariableTypes[constName] = CHAR;
+                current = (TOKEN) lexer->yylex();
             }
             else {
                 Error("Valeur constante attendue");
             }
             
-            current = (TOKEN) lexer->yylex();
             if(current != DOT && current != SEMICOLON) Error(". ou ; attendu après la déclaration de constante");
             if(current == SEMICOLON) current = (TOKEN) lexer->yylex();
         }
@@ -672,6 +673,7 @@ void VarDeclarationPart() {
 		cout << "FormatString1:\t.string \"%llu\\n\"\n";
 		cout << "FormatString2:\t.string \"%f\\n\"\n";  // tp7
     	cout << "FormatString3:\t.string \"%c\\n\"\n";  // tp7
+        cout << "FormatString4:\t.string \"%lld\\n\"" << endl;
 		cout << "\t.align 8" << endl;
 
 		current = (TOKEN) lexer->yylex();  // on avance après VAR
@@ -854,64 +856,72 @@ void BlockStatement();
 void IfStatement();
 void CaseStatement(); 
 
-	// Statement := AssignementStatement
-void Statement(void){
-	if(current==ID){
-		AssignementStatement();
-	}
-	else if(current == KEYWORD){
-		//cout << "Keyword detected: " << lexer->YYText() << endl;
-		if(strcmp(lexer->YYText(),"FOR")==0){
-			ForStatement();
-		}
-		else if(strcmp(lexer->YYText(),"WHILE")==0){
-			WhileStatement();
-		}
-		else if(strcmp(lexer->YYText(),"IF")==0){
-			IfStatement();
-		}
-		else if(strcmp(lexer->YYText(),"BEGIN")==0){
-			BlockStatement();
-		}
-		else if(strcmp(lexer->YYText(), "CASE") == 0) {
+// Statement := AssignementStatement
+void Statement(void) {
+    if(current == ID) {
+        AssignementStatement();
+    }
+    else if(current == KEYWORD) {
+        if(strcmp(lexer->YYText(), "FOR") == 0) {
+            ForStatement();
+        }
+        else if(strcmp(lexer->YYText(), "WHILE") == 0) {
+            WhileStatement();
+        }
+        else if(strcmp(lexer->YYText(), "IF") == 0) {
+            IfStatement();
+        }
+        else if(strcmp(lexer->YYText(), "BEGIN") == 0) {
+            BlockStatement();
+        }
+        else if(strcmp(lexer->YYText(), "CASE") == 0) {
             CaseStatement();
         }
-		else if(strcmp(lexer->YYText(), "DISPLAY") == 0){
-			current = (TOKEN) lexer->yylex();
-			TYPE exprType = Expression();
-			switch(exprType) {
-        case DOUBLE:
-            cout << "\tfldl (%rsp)" << endl;      // Charge le flottant dans %st(0)
-            cout << "\taddq $8, %rsp" << endl;    // Nettoie la pile
-            cout << "\tsubq $8, %rsp" << endl;    // Réserve de l'espace
-            cout << "\tfstpl (%rsp)" << endl;     // Stocke le flottant
-            cout << "\tmovq $FormatString2, %rdi" << endl;
-            cout << "\tmovl $1, %eax" << endl;    // 1 argument flottant
-            cout << "\tcall printf@PLT" << endl;
-            cout << "\taddq $8, %rsp" << endl;    // Nettoie la pile
-            break;
+        else if(strcmp(lexer->YYText(), "DISPLAY") == 0) {
+            current = (TOKEN) lexer->yylex();
+            TYPE exprType = Expression();
             
-        case CHAR:
-            cout << "\tpopq %rsi" << endl;         // Récupère le caractère
-            cout << "\tmovq $FormatString3, %rdi" << endl;
-            cout << "\tmovl $0, %eax" << endl;    // Pas d'argument flottant
-            cout << "\tcall printf@PLT" << endl;
-            break;
-            
-        default: // UNSIGNED_INT et BOOLEAN
-            cout << "\tpopq %rsi" << endl;
-            cout << "\tmovq $FormatString1, %rdi" << endl;
-            cout << "\tmovl $0, %eax" << endl;
-            cout << "\tcall printf@PLT" << endl;
-    }
+            switch(exprType) {
+                case DOUBLE:
+                    cout << "\tmovsd (%rsp), %xmm0" << endl;
+                    cout << "\tmovq $FormatString2, %rdi" << endl;
+                    cout << "\tmovl $1, %eax" << endl;
+                    cout << "\tcall printf@PLT" << endl;
+                    cout << "\taddq $8, %rsp" << endl;
+                    break;
+
+                case CHAR:
+                    cout << "\tmovq (%rsp), %rsi" << endl;
+                    cout << "\tmovq $FormatString3, %rdi" << endl;
+                    cout << "\tmovl $0, %eax" << endl;
+                    cout << "\tcall printf@PLT" << endl;
+                    cout << "\taddq $8, %rsp" << endl;
+                    break;
+
+                case BOOLEAN:
+                cout << "\tmovq (%rsp), %rsi" << endl;
+                cout << "\tmovq $FormatString4, %rdi" << endl; // Nouveau format pour les booléens
+                cout << "\tmovl $0, %eax" << endl;
+                cout << "\tcall printf@PLT" << endl;
+                cout << "\taddq $8, %rsp" << endl;
+                break;
+
+                default: // BOOLEAN et UNSIGNED_INT
+                    cout << "\tmovq (%rsp), %rsi" << endl;
+                    cout << "\tmovq $FormatString1, %rdi" << endl;
+                    cout << "\tmovl $0, %eax" << endl;
+                    cout << "\tcall printf@PLT" << endl;
+                    cout << "\taddq $8, %rsp" << endl;
+                    break;
+            }
         }
-		else {
+        else {
             Error("Mot-clé non reconnu");
         }
-	}
-	else {
-       	Error("Instruction attendue: identifiant ou mot-clé");
-	}
+    }
+    else {
+        Error("Instruction attendue: identifiant ou mot-clé");
+    }
 }
 
 // ForStatement := Identifier ":=" <Expression>, "TO" <Expression>, "DO" <instruction> ["STEP"<const>] 
