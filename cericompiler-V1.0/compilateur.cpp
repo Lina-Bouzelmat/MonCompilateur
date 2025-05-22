@@ -34,7 +34,7 @@ using namespace std;
 enum OPREL {EQU, DIFF, INF, SUP, INFE, SUPE, WTFR};
 enum OPADD {ADD, SUB, OR, WTFA};
 enum OPMUL {MUL, DIV, MOD, AND ,WTFM};
-enum TYPE {UNSIGNED_INT, BOOLEAN, DOUBLE, CHAR, ERROR_TYPE};
+enum TYPE {INTEGER, UNSIGNED_INT, BOOLEAN, DOUBLE, CHAR, ERROR_TYPE};
 
 // Function prototypes
 TYPE Expression(void);
@@ -696,7 +696,7 @@ void VarDeclarationPart() {
 			TYPE type;
 			if(current != KEYWORD) Error("Type attendu");
 			if(strcmp(lexer->YYText(), "INTEGER") == 0) {
-				type = UNSIGNED_INT;
+				type = INTEGER;
 			} else if(strcmp(lexer->YYText(), "DOUBLE") == 0) {
                 type = DOUBLE;
             } else if(strcmp(lexer->YYText(), "CHAR") == 0) {
@@ -718,6 +718,7 @@ void VarDeclarationPart() {
                     case DOUBLE:
                         cout << id << ":\t.double 0.0" << endl;
                         break;
+                    case INTEGER:
                     case CHAR:
                         cout << id << ":\t.byte 0" << endl;
                         break;
@@ -897,6 +898,14 @@ void Statement(void) {
                     cout << "\tcall printf@PLT" << endl;
                     cout << "\taddq $8, %rsp" << endl;
                     break;
+                
+                    case INTEGER:  // Nouveau cas pour les entiers signés
+                        cout << "\tmovq (%rsp), %rsi" << endl;
+                        cout << "\tmovq $FormatString4, %rdi" << endl;  // Utilise le format %lld
+                        cout << "\tmovl $0, %eax" << endl;
+                        cout << "\tcall printf@PLT" << endl;
+                        cout << "\taddq $8, %rsp" << endl;
+                        break;
 
                 case BOOLEAN:
                 cout << "\tmovq (%rsp), %rsi" << endl;
