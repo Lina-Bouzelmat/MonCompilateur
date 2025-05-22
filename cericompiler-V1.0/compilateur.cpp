@@ -516,16 +516,16 @@ TYPE SimpleExpression(void){
                     cout << "\tfldl 8(%rsp)" << endl;
                     cout << "\tfldl (%rsp)" << endl;
                     cout << "\taddq $16, %rsp" << endl;
-                    
                     if(adop == ADD) {
                         cout << "\tfaddp" << endl;
-                    } else if(adop == SUB) {
+                    }
+                    else if(adop == SUB) {
                         cout << "\tfsubp" << endl;
+                        cout << "\tfchs" << endl;
                     }
                     cout << "\tsubq $8, %rsp" << endl;
                     cout << "\tfstpl (%rsp)" << endl;
                     break;
-
                 case CHAR:
 					cout << "\tpopq %rbx" << endl;
                     cout << "\tpopq %rax" << endl;
